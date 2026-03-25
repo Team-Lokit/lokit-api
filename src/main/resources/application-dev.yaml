@@ -1,0 +1,120 @@
+spring:
+    datasource:
+        url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+        username: ${POSTGRES_USER}
+        password: ${POSTGRES_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+        hikari:
+            leak-detection-threshold: 5000
+            maximum-pool-size: 12
+            minimum-idle: 3
+            initialization-fail-timeout: 60000
+            connection-timeout: 5000
+            validation-timeout: 3000
+    jpa:
+        hibernate:
+            ddl-auto: update
+        properties:
+            hibernate:
+                format_sql: false
+                show_sql: false
+                use_sql_comments: true
+                jdbc:
+                    batch_size: 50
+                default_batch_fetch_size: 100
+                order_inserts: true
+                order_updates: true
+            jdbc:
+                time_zone: Asia/Seoul
+        open-in-view: false
+        defer-datasource-initialization: true
+    sql:
+        init:
+            mode: never
+    task:
+        execution:
+            pool:
+                core-size: 4
+                max-size: 24
+server:
+    tomcat:
+        threads:
+            max: 80
+            min-spare: 8
+        max-connections: 500
+        accept-count: 100
+        connection-timeout: 10s
+        keep-alive-timeout: 10s
+
+logging:
+    request:
+        verbose: true
+    level:
+        root: INFO
+        kr.co.lokit.api: DEBUG
+        kr.co.lokit.api.config.security: INFO
+
+management:
+    endpoints:
+        web:
+            exposure:
+                include: "*"
+            base-path: /actuator
+    endpoint:
+        health:
+            show-details: when-authorized
+    health:
+        db:
+            enabled: false
+
+jwt:
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_EXPIRATION}
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION}
+
+springdoc:
+    api-docs:
+        enabled: true
+        path: /docs
+    swagger-ui:
+        enabled: true
+        path: /swagger
+        display-request-duration: true
+        tags-sorter: alpha
+    default-consumes-media-type: application/json
+    default-produces-media-type: application/json
+
+aws:
+    s3:
+        enabled: true
+        region: ${AWS_REGION}
+        bucket: ${AWS_S3_BUCKET}
+        public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+
+kakao:
+    api:
+        key: ${KAKAO_API_KEY}
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_CLIENT_SECRET}
+    redirect-uri: ${KAKAO_REDIRECT_URI}
+    front-redirect-uri: ${KAKAO_FRONT_REDIRECT_URI}
+
+cookie:
+    secure: true
+    domain: ${COOKIE_DOMAIN:}
+    name-prefix: ${COOKIE_NAME_PREFIX:dev}
+
+discord:
+    webhook:
+        url: ${DISCORD_WEBHOOK_URL:}
+    lifecycle:
+        enabled: false
+
+admin.key: ${ADMIN_KEY:}
+
+cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+
+redirect:
+    local-host: ${LOCAL_HOST:}
+    allowed-domain: ${ALLOWED_DOMAIN:}

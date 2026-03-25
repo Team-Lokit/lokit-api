@@ -1,0 +1,9 @@
+domain {
+    encode zstd gzip
+
+    reverse_proxy ip:8080 {
+                              transport http {
+                                                 read_timeout 10s
+                                             }
+                          }
+}
