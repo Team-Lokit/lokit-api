@@ -15,4 +15,5 @@ fun MyPageReadModel.toResponse(): MyPageResponse =
         couplePhotoCount = couplePhotoCount,
         defaultAlbumId = defaultAlbumId,
         backgroundImageUrl = backgroundImageUrl,
+        joinedDate = joinedDate,
     )

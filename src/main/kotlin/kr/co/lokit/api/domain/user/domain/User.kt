@@ -12,6 +12,7 @@ data class User(
     var profileImageUrl: String? = null,
     val status: AccountStatus = AccountStatus.ACTIVE,
     val withdrawnAt: LocalDateTime? = null,
+    val joinedAt: LocalDateTime? = null
 ) {
     fun withNickname(nickname: String): User = copy(name = nickname)
 

@@ -13,4 +13,5 @@ data class MyPageReadModel(
     val couplePhotoCount: Long,
     val defaultAlbumId: Long,
     val backgroundImageUrl: String?,
+    val joinedDate: LocalDate?,
 )
