@@ -75,6 +75,7 @@ class MyPageService(
             couplePhotoCount = couplePhotoCount,
             defaultAlbumId = defaultAlbumId,
             backgroundImageUrl = backgroundImageUrl,
+            joinedDate = me.joinedAt?.toLocalDate(),
         )
     }
 

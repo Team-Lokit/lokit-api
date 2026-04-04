@@ -46,4 +46,6 @@ data class MyPageResponse(
     val defaultAlbumId: Long,
     @Schema(description = "랜덤 배경 사진", example = "https://example.com/background.jpg")
     val backgroundImageUrl: String?,
+    @Schema(description = "회원가입 날짜", example = "2026-04-01")
+    val joinedDate: LocalDate?,
 )
