@@ -1,3 +1,16 @@
+FROM eclipse-temurin:24-jdk-alpine AS builder
+
+WORKDIR /workspace
+
+COPY gradlew ./
+COPY gradle gradle
+COPY build.gradle.kts settings.gradle.kts ./
+COPY src src
+
+RUN chmod +x ./gradlew \
+    && ./gradlew --no-daemon bootJar -x test \
+    && cp "$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)" app.jar
+
 FROM eclipse-temurin:24-jre-alpine
 
 RUN apk add --no-cache tzdata \
@@ -12,7 +25,7 @@ WORKDIR /app
 RUN mkdir -p /app/logs \
     && chown -R spring:spring /app
 
-COPY --chown=spring:spring build/libs/*.jar app.jar
+COPY --from=builder --chown=spring:spring /workspace/app.jar app.jar
 
 USER spring
 
