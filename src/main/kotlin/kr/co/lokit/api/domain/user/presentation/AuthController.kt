@@ -9,6 +9,7 @@ import kr.co.lokit.api.config.web.CookieGenerator
 import kr.co.lokit.api.domain.couple.application.CoupleCookieStatusResolver
 import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.domain.user.application.LoginService
+import kr.co.lokit.api.domain.user.infrastructure.oauth.apple.AppleOAuthProperties
 import kr.co.lokit.api.domain.user.infrastructure.oauth.kakao.KakaoOAuthProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -33,6 +34,7 @@ class AuthController(
     private val loginService: LoginService,
     private val authService: AuthService,
     private val coupleCookieStatusResolver: CoupleCookieStatusResolver,
+    private val appleOAuthProperties: AppleOAuthProperties,
     private val kakaoOAuthProperties: KakaoOAuthProperties,
     private val cookieGenerator: CookieGenerator,
     @Value("\${redirect.local-host}") private val localHostRedirect: String,
@@ -56,6 +58,31 @@ class AuthController(
             KakaoOAuthProperties.AUTHORIZATION_URL +
                 "?client_id=${kakaoOAuthProperties.clientId}" +
                 "&redirect_uri=${kakaoOAuthProperties.redirectUri}" +
+                "&response_type=code" +
+                "&state=$state"
+
+        return ResponseEntity
+            .status(HttpStatus.FOUND)
+            .location(URI.create(authUrl))
+            .build()
+    }
+
+    @ResponseStatus(HttpStatus.FOUND)
+    @GetMapping("apple")
+    override fun appleAuthorize(
+        @RequestParam(required = false) redirect: String?,
+        req: HttpServletRequest,
+    ): ResponseEntity<Unit> {
+        val resolvedRedirect = redirect ?: resolveRedirectFromReferer(req)
+        val state =
+            resolvedRedirect
+                ?.let { URLEncoder.encode(it, StandardCharsets.UTF_8) }
+                .orEmpty()
+
+        val authUrl =
+            AppleOAuthProperties.AUTHORIZATION_URL +
+                "?client_id=${appleOAuthProperties.clientId}" +
+                "&redirect_uri=${appleOAuthProperties.redirectUri}" +
                 "&response_type=code" +
                 "&state=$state"
 
