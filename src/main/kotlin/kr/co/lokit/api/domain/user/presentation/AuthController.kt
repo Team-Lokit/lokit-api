@@ -9,7 +9,7 @@ import kr.co.lokit.api.config.web.CookieGenerator
 import kr.co.lokit.api.domain.couple.application.CoupleCookieStatusResolver
 import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.domain.user.application.LoginService
-import kr.co.lokit.api.domain.user.infrastructure.oauth.KakaoOAuthProperties
+import kr.co.lokit.api.domain.user.infrastructure.oauth.kakao.KakaoOAuthProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
