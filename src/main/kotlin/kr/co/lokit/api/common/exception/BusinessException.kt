@@ -137,6 +137,19 @@ sealed class BusinessException(
         errors: Map<String, String> = emptyMap(),
     ) : BusinessException(ErrorCode.KAKAO_EMAIL_NOT_PROVIDED, message, cause, errors)
 
+    // Apple OAuth
+    class AppleApiException(
+        message: String = ErrorCode.APPLE_API_ERROR.message,
+        cause: Throwable? = null,
+        errors: Map<String, String> = emptyMap(),
+    ) : BusinessException(ErrorCode.APPLE_API_ERROR, message, cause, errors)
+
+    class InvalidAppleTokenException(
+        message: String = ErrorCode.INVALID_APPLE_TOKEN.message,
+        cause: Throwable? = null,
+        errors: Map<String, String> = emptyMap(),
+    ) : BusinessException(ErrorCode.INVALID_APPLE_TOKEN, message, cause, errors)
+
     // Photo
     class DefaultAlbumNotFoundForUserException(
         message: String = ErrorCode.DEFAULT_ALBUM_NOT_FOUND_FOR_USER.message,

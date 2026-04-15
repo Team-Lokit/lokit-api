@@ -32,6 +32,10 @@ enum class ErrorCode(
     INVALID_KAKAO_TOKEN(HttpStatus.UNAUTHORIZED, "KAKAO_002", "유효하지 않은 카카오 액세스 토큰입니다"),
     KAKAO_EMAIL_NOT_PROVIDED(HttpStatus.BAD_REQUEST, "KAKAO_003", "카카오 계정에서 이메일 정보를 제공받지 못했습니다"),
 
+    // Apple OAuth
+    APPLE_API_ERROR(HttpStatus.BAD_GATEWAY, "APPLE_001", "애플 API 호출에 실패했습니다"),
+    INVALID_APPLE_TOKEN(HttpStatus.UNAUTHORIZED, "APPLE_002", "유효하지 않은 애플 토큰입니다"),
+
     // Resource
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "RESOURCE_001", "요청한 리소스를 찾을 수 없습니다"),
     RESOURCE_ALREADY_EXISTS(HttpStatus.CONFLICT, "RESOURCE_002", "이미 존재하는 리소스입니다"),

@@ -3,15 +3,16 @@ package kr.co.lokit.api.domain.user.infrastructure.oauth.apple
 import kr.co.lokit.api.domain.user.application.port.OAuthClientPort
 import kr.co.lokit.api.domain.user.application.port.OAuthProvider
 import kr.co.lokit.api.domain.user.application.port.OAuthUserInfo
+import org.springframework.stereotype.Component
 
-class AppleOAuthClientAdapter(private val appleOAuthClient: AppleOAuthClient): OAuthClientPort {
-    override val provider: OAuthProvider = OAuthProvider.APPLE
+@Component
+class AppleOAuthClientAdapter(
+    private val appleOAuthClient: AppleOAuthClient,
+) : OAuthClientPort {
+    override val provider: OAuthProvider
+        get() = appleOAuthClient.provider
 
-    override fun getAccessToken(code: String): String {
-        TODO("Not yet implemented")
-    }
+    override fun getAccessToken(code: String): String = appleOAuthClient.getAccessToken(code)
 
-    override fun getUserInfo(accessToken: String): OAuthUserInfo {
-        TODO("Not yet implemented")
-    }
+    override fun getUserInfo(accessToken: String): OAuthUserInfo = appleOAuthClient.getUserInfo(accessToken)
 }
