@@ -7,7 +7,7 @@ data class AppleOAuthProperties(
     val clientId: String,
     val teamId: String,
     val keyId: String,
-    val privateKey: String,
+    val privateKeyPath: String,
     val redirectUri: String,
     val frontRedirectUri: String,
 ) {
