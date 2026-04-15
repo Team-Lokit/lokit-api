@@ -10,8 +10,7 @@ import java.security.PrivateKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.Base64
-import java.util.Date
+import java.util.*
 
 @Component
 @EnableConfigurationProperties(AppleOAuthProperties::class)
@@ -29,7 +28,7 @@ class AppleClientSecretGenerator(
             .and()
             .issuer(properties.teamId)
             .issuedAt(Date.from(now))
-            .expiration(Date.from(now.plus(5, ChronoUnit.MINUTES)))
+            .expiration(Date.from(now.plus(180, ChronoUnit.DAYS)))
             .audience().add("https://appleid.apple.com").and()
             .subject(properties.clientId)
             .signWith(privateKey, Jwts.SIG.ES256)
