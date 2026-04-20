@@ -31,9 +31,11 @@ class KakaoLoginService(
     private val lockManager: LockManager,
     private val cacheManager: CacheManager,
 ) : LoginService {
+    override val provider: OAuthProvider
+        get() = OAuthProvider.KAKAO
+
     @Transactional
     override fun login(code: String): LoginResult {
-        val provider = OAuthProvider.KAKAO
         val client = oAuthClientRegistry.getClient(provider)
         val accessToken = client.getAccessToken(code)
         val userInfo = client.getUserInfo(accessToken)
