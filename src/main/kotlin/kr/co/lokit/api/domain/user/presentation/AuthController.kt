@@ -154,7 +154,7 @@ class AuthController(
                 ?: appleOAuthProperties.frontRedirectUri
 
         return try {
-            val service = loginServiceRegistry.getService(OAuthProvider.KAKAO)
+            val service = loginServiceRegistry.getService(OAuthProvider.APPLE)
             val loginResult = service.login(code)
             val accessTokenCookie = cookieGenerator.createAccessTokenCookie(req, loginResult.tokens.accessToken)
             val refreshTokenCookie = cookieGenerator.createRefreshTokenCookie(req, loginResult.tokens.refreshToken)
