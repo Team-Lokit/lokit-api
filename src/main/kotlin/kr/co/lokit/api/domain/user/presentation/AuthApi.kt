@@ -59,6 +59,13 @@ interface AuthApi {
         @Parameter(hidden = true) req: HttpServletRequest,
     ): ResponseEntity<Unit>
 
+    @Operation(hidden = true)
+    fun appleCallback(
+        @RequestParam code: String,
+        @RequestParam(required = false) state: String?,
+        @Parameter(hidden = true) req: HttpServletRequest,
+    ): ResponseEntity<Unit>
+
     @SecurityRequirement(name = "Authorization")
     @Operation(
         summary = "로그아웃",
