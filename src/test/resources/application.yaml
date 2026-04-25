@@ -69,7 +69,7 @@ kakao:
 
 apple:
     client-id: test-client-id
-    private-key-path: test-private-key-path
+    private-key-path: src/test/resources/keys/apple-test-private-key.p8
     team-id: test-team-id
     key-id: test-key-id
     redirect-uri: http://localhost:8080/api/auth/apple/callback
