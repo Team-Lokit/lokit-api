@@ -54,6 +54,9 @@ class UserControllerTest {
         whenever(cookieGenerator.clearRefreshTokenCookie(any())).thenReturn(
             ResponseCookie.from(DomainCookie.REFRESH_TOKEN.value, "").maxAge(0).build(),
         )
+        whenever(cookieGenerator.clearCoupleStatusCookie(any())).thenReturn(
+            ResponseCookie.from(DomainCookie.COUPLE_STATUS.value, "").maxAge(0).build(),
+        )
 
         mockMvc
             .perform(

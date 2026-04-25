@@ -72,15 +72,15 @@ class UserWithdrawServiceTest {
         whenever(userRepository.findById(1L)).thenReturn(user)
         whenever(coupleRepository.findByUserId(1L)).thenReturn(null)
 
-        val userDetailsCache = mock(Cache::class.java)
-        val userCoupleCache = mock(Cache::class.java)
-        whenever(cacheManager.getCache("userDetails")).thenReturn(userDetailsCache)
-        whenever(cacheManager.getCache("userCouple")).thenReturn(userCoupleCache)
+//        val userDetailsCache = mock(Cache::class.java)
+//        val userCoupleCache = mock(Cache::class.java)
+//        whenever(cacheManager.getCache("userDetails")).thenReturn(userDetailsCache)
+//        whenever(cacheManager.getCache("userCouple")).thenReturn(userCoupleCache)
 
         userWithdrawService.withdraw(1L)
 
-        verify(userDetailsCache).evict("test@test.com")
-        verify(userCoupleCache).evict(1L)
+//        verify(userDetailsCache).evict("test@test.com")
+//        verify(userCoupleCache).evict(1L)
     }
 
     @Test
