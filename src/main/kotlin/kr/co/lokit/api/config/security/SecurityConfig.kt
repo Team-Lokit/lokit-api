@@ -69,6 +69,8 @@ class SecurityConfig(
                     .requestMatchers(
                         "/auth/kakao",
                         "/auth/kakao/callback",
+                        "/auth/apple",
+                        "/auth/apple/callback",
                         "/emails",
                         "/emails/**",
                     ).permitAll()

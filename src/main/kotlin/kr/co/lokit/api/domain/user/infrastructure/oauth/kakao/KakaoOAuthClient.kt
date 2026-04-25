@@ -1,4 +1,4 @@
-package kr.co.lokit.api.domain.user.infrastructure.oauth
+package kr.co.lokit.api.domain.user.infrastructure.oauth.kakao
 
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.common.exception.ErrorField
@@ -7,6 +7,7 @@ import kr.co.lokit.api.domain.user.application.port.OAuthProvider
 import kr.co.lokit.api.domain.user.application.port.OAuthUserInfo
 import kr.co.lokit.api.domain.user.dto.KakaoTokenResponse
 import kr.co.lokit.api.domain.user.dto.KakaoUserInfoResponse
+import kr.co.lokit.api.domain.user.infrastructure.oauth.OAuthClient
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.http.HttpStatusCode
 import org.springframework.http.MediaType

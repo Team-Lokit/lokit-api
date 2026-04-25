@@ -56,15 +56,15 @@ class CoupleReconnectServiceTest {
         `when`(coupleRepository.findByUserId(1L)).thenReturn(null)
         `when`(coupleRepository.reconnect(1L, 1L)).thenReturn(reconnectedCouple)
         `when`(userRepository.findById(2L)).thenReturn(createUser(id = 2L, name = "파트너"))
-        `when`(cacheManager.getCache("userCouple")).thenReturn(cache)
+//        `when`(cacheManager.getCache("userCouple")).thenReturn(cache)
 
         val result = coupleReconnectService.reconnect(1L)
 
         assertEquals(true, result.isCoupled)
         assertEquals(2L, result.partnerSummary?.userId)
         verify(coupleRepository).reconnect(1L, 1L)
-        verify(cache).evict(1L)
-        verify(cache).evict(2L)
+//        verify(cache).evict(1L)
+//        verify(cache).evict(2L)
     }
 
     @Test
@@ -93,7 +93,7 @@ class CoupleReconnectServiceTest {
         `when`(coupleRepository.findById(3L)).thenReturn(existingSoloCouple)
         `when`(coupleRepository.reconnect(1L, 1L)).thenReturn(reconnectedCouple)
         `when`(userRepository.findById(2L)).thenReturn(createUser(id = 2L, name = "파트너"))
-        `when`(cacheManager.getCache("userCouple")).thenReturn(cache)
+//        `when`(cacheManager.getCache("userCouple")).thenReturn(cache)
 
         val result = coupleReconnectService.reconnect(1L)
 

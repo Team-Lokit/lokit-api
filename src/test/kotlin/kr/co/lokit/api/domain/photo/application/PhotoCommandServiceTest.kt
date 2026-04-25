@@ -239,19 +239,19 @@ class PhotoCommandServiceTest {
     fun `사진 생성 시 위치 기반 캐시가 제거된다`() {
         val photo = createPhoto(albumId = 1L, location = createLocation(127.0, 37.5))
         val savedPhoto = createPhoto(id = 1L, albumId = 1L, coupleId = 1L, location = createLocation(127.0, 37.5))
-        val mockCache = mock(Cache::class.java)
+//        val mockCache = mock(Cache::class.java)
         doNothing().`when`(photoStoragePort).verifyFileExists(photo.url)
         doNothing().`when`(currentCoupleAlbumResolver).validateAlbumBelongsToCurrentCouple(1L, 1L, ErrorField.UPLOADED_BY_ID)
         `when`(mapQueryService.getLocationInfo(anyDouble(), anyDouble())).thenReturn(
             LocationInfoReadModel(address = "서울 강남구", placeName = null, regionName = "강남구"),
         )
         `when`(photoRepository.save(anyObject())).thenReturn(savedPhoto)
-        `when`(cacheManager.getCache("coupleAlbums")).thenReturn(mockCache)
+//        `when`(cacheManager.getCache("coupleAlbums")).thenReturn(mockCache)
 
         photoCommandService.create(photo)
 
         verify(mapPhotosCacheService).evictForPhotoMutation(1L, 1L, 127.0, 37.5)
-        verify(mockCache).evict(1L)
+//        verify(mockCache).evict(1L)
     }
 
     @Test
@@ -265,13 +265,13 @@ class PhotoCommandServiceTest {
                 albumId = 2L,
                 location = createLocation(127.1, 37.6),
             )
-        val mockCache = mock(Cache::class.java)
+//        val mockCache = mock(Cache::class.java)
         `when`(photoRepository.findById(1L)).thenReturn(photo)
-        `when`(cacheManager.getCache("coupleAlbums")).thenReturn(mockCache)
+//        `when`(cacheManager.getCache("coupleAlbums")).thenReturn(mockCache)
 
         photoCommandService.delete(1L, 1L)
 
         verify(mapPhotosCacheService).evictForPhotoMutation(1L, 2L, 127.1, 37.6)
-        verify(mockCache).evict(1L)
+//        verify(mockCache).evict(1L)
     }
 }

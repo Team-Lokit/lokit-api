@@ -12,6 +12,7 @@ fun UserEntity.toDomain(): User =
         profileImageUrl = profileImageUrl,
         status = status,
         withdrawnAt = withdrawnAt,
+        joinedAt = createdAt,
     )
 
 fun User.toEntity(): UserEntity =

@@ -1,0 +1,58 @@
+services:
+    postgres:
+        image: postgis/postgis:16-3.4
+        restart: unless-stopped
+        env_file: .env
+        networks:
+            - lokit
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+            - ./infra/init.sql:/docker-entrypoint-initdb.d/init.sql
+        healthcheck:
+            test: [ "CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB" ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    app:
+        build:
+            context: .
+            dockerfile: infra/Dockerfile
+        restart: unless-stopped
+        env_file: .env
+        networks:
+            - lokit
+        environment:
+            POSTGRES_HOST: postgres
+            POSTGRES_PORT: "5432"
+            TZ: Asia/Seoul
+        volumes:
+            - ${APPLE_KEY_HOST_DIR}:/app/secrets:ro
+        depends_on:
+            postgres:
+                condition: service_healthy
+        mem_limit: 1280m
+
+    caddy:
+        image: caddy:alpine
+        restart: unless-stopped
+        networks:
+            - lokit
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile
+            - caddy_data:/data
+            - caddy_config:/config
+        depends_on:
+            - app
+
+volumes:
+    postgres_data:
+    caddy_data:
+    caddy_config:
+
+networks:
+    lokit:
+        driver: bridge
