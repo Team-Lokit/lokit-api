@@ -1,17 +1,17 @@
-name: Dev CI/CD
+name: Prod CI/CD
 
 on:
     push:
-        branches: [ develop ]
+        branches: [ main ]
         paths-ignore:
             - "**/*.md"
     pull_request:
-        branches: [ develop ]
+        branches: [ main ]
         paths-ignore:
             - "**/*.md"
 
 concurrency:
-    group: lokit-dev-${{ github.ref }}
+    group: lokit-prod-${{ github.ref }}
     cancel-in-progress: true
 
 jobs:
@@ -232,6 +232,6 @@ jobs:
                     key: ${{ secrets.PROD_GCP_SSH_KEY }}
                     script: |
                         cd /home/lokit-api
-                        sudo git pull origin develop
+                        sudo git pull origin main
                         sudo docker compose up --build -d
                         sudo docker image prune -f
