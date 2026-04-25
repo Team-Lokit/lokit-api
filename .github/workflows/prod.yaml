@@ -1,17 +1,17 @@
-name: Prod CI/CD
+name: Dev CI/CD
 
 on:
     push:
-        branches: [ main ]
+        branches: [ develop ]
         paths-ignore:
             - "**/*.md"
     pull_request:
-        branches: [ main ]
+        branches: [ develop ]
         paths-ignore:
             - "**/*.md"
 
 concurrency:
-    group: lokit-prod-${{ github.ref }}
+    group: lokit-dev-${{ github.ref }}
     cancel-in-progress: true
 
 jobs:
@@ -217,6 +217,8 @@ jobs:
                         exit 1
                     fi
 
+
+
     cd:
         if: github.event_name == 'push'
         runs-on: ubuntu-latest
@@ -229,7 +231,7 @@ jobs:
                     username: ${{ secrets.PROD_GCP_USERNAME }}
                     key: ${{ secrets.PROD_GCP_SSH_KEY }}
                     script: |
-                        cd ~/27th-Web-Team-1-BE
-                        sudo git pull origin main
+                        cd /home/lokit-api
+                        sudo git pull origin develop
                         sudo docker compose up --build -d
                         sudo docker image prune -f
