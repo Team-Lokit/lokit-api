@@ -45,6 +45,8 @@ services:
             - ./Caddyfile:/etc/caddy/Caddyfile
             - caddy_data:/data
             - caddy_config:/config
+            - ../caddy/.local/share/caddy:/data/caddy
+            - ../caddy/.config/caddy:/config/caddy
         depends_on:
             - app
 
