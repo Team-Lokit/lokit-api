@@ -16,33 +16,31 @@ import kr.co.lokit.api.domain.user.domain.AccountRecoveryPolicy
 import kr.co.lokit.api.domain.user.domain.AuthTokens
 import kr.co.lokit.api.domain.user.domain.LoginResult
 import kr.co.lokit.api.domain.user.domain.User
-import org.springframework.cache.CacheManager
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
 @Service
-class KakaoLoginService(
+class AppleLoginService(
     private val oAuthClientRegistry: OAuthClientRegistryPort,
     private val userRepository: UserRepositoryPort,
     private val refreshTokenRepository: RefreshTokenRepositoryPort,
     private val jwtTokenProvider: JwtTokenProvider,
     private val createCoupleUseCase: CreateCoupleUseCase,
     private val lockManager: LockManager,
-    private val cacheManager: CacheManager,
 ) : LoginService {
     override val provider: OAuthProvider
-        get() = OAuthProvider.KAKAO
+        get() = OAuthProvider.APPLE
 
     @Transactional
     override fun login(code: String): LoginResult {
         val client = oAuthClientRegistry.getClient(provider)
-        val accessToken = client.getAccessToken(code)
-        val userInfo = client.getUserInfo(accessToken)
+        val idToken = client.getAccessToken(code)
+        val userInfo = client.getUserInfo(idToken)
 
         val email =
             userInfo.email
-                ?: throw BusinessException.KakaoEmailNotProvidedException(
+                ?: throw BusinessException.InvalidAppleTokenException(
                     message = "${provider.name} 계정에서 이메일 정보를 제공받지 못했습니다",
                     errors = errorDetailsOf(ErrorField.PROVIDER_ID to userInfo.providerId),
                 )
@@ -54,11 +52,6 @@ class KakaoLoginService(
                 createCoupleUseCase.createIfNone(Couple(name = Couple.DEFAULT_COUPLE_NAME), loadedUser.id)
                 LoginLoadResult(user = loadedUser.recoveredIf(recovered), recovered = recovered)
             })
-
-        if (loginResult.recovered) {
-//            cacheManager.evictKey(CacheRegion.USER_DETAILS, loginResult.user.email)
-//            cacheManager.evictKey(CacheRegion.USER_COUPLE, loginResult.user.id)
-        }
 
         return LoginResult(
             userId = loginResult.user.id,

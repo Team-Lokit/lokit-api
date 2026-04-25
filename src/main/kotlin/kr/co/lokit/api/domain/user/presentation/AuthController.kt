@@ -8,19 +8,16 @@ import kr.co.lokit.api.common.exception.ErrorCode
 import kr.co.lokit.api.config.web.CookieGenerator
 import kr.co.lokit.api.domain.couple.application.CoupleCookieStatusResolver
 import kr.co.lokit.api.domain.user.application.AuthService
-import kr.co.lokit.api.domain.user.application.LoginService
-import kr.co.lokit.api.domain.user.infrastructure.oauth.KakaoOAuthProperties
+import kr.co.lokit.api.domain.user.application.OAuthLoginServiceRegistry
+import kr.co.lokit.api.domain.user.application.port.OAuthProvider
+import kr.co.lokit.api.domain.user.infrastructure.oauth.apple.AppleOAuthProperties
+import kr.co.lokit.api.domain.user.infrastructure.oauth.kakao.KakaoOAuthProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.ResponseStatus
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
 import java.net.URLDecoder
@@ -30,9 +27,10 @@ import java.nio.charset.StandardCharsets
 @RestController
 @RequestMapping("auth")
 class AuthController(
-    private val loginService: LoginService,
+    private val loginServiceRegistry: OAuthLoginServiceRegistry,
     private val authService: AuthService,
     private val coupleCookieStatusResolver: CoupleCookieStatusResolver,
+    private val appleOAuthProperties: AppleOAuthProperties,
     private val kakaoOAuthProperties: KakaoOAuthProperties,
     private val cookieGenerator: CookieGenerator,
     @Value("\${redirect.local-host}") private val localHostRedirect: String,
@@ -66,6 +64,33 @@ class AuthController(
     }
 
     @ResponseStatus(HttpStatus.FOUND)
+    @GetMapping("apple")
+    override fun appleAuthorize(
+        @RequestParam(required = false) redirect: String?,
+        req: HttpServletRequest,
+    ): ResponseEntity<Unit> {
+        val resolvedRedirect = redirect ?: resolveRedirectFromReferer(req)
+        val state =
+            resolvedRedirect
+                ?.let { URLEncoder.encode(it, StandardCharsets.UTF_8) }
+                .orEmpty()
+
+        val authUrl =
+            AppleOAuthProperties.AUTHORIZATION_URL +
+                "?client_id=${appleOAuthProperties.clientId}" +
+                "&redirect_uri=${appleOAuthProperties.redirectUri}" +
+                "&response_type=code" +
+                "&scope=email" +
+                "&response_mode=form_post" +
+                "&state=$state"
+
+        return ResponseEntity
+            .status(HttpStatus.FOUND)
+            .location(URI.create(authUrl))
+            .build()
+    }
+
+    @ResponseStatus(HttpStatus.FOUND)
     @GetMapping("kakao/callback")
     override fun kakaoCallback(
         @RequestParam code: String,
@@ -80,7 +105,8 @@ class AuthController(
                 ?: kakaoOAuthProperties.frontRedirectUri
 
         return try {
-            val loginResult = loginService.login(code)
+            val service = loginServiceRegistry.getService(OAuthProvider.KAKAO)
+            val loginResult = service.login(code)
             val accessTokenCookie = cookieGenerator.createAccessTokenCookie(req, loginResult.tokens.accessToken)
             val refreshTokenCookie = cookieGenerator.createRefreshTokenCookie(req, loginResult.tokens.refreshToken)
             log.info(
@@ -106,6 +132,55 @@ class AuthController(
                 .build()
         } catch (ex: Exception) {
             log.error("Kakao callback unexpected error: redirectUri={}", redirectUri, ex)
+            ResponseEntity
+                .status(HttpStatus.FOUND)
+                .location(URI.create(buildErrorRedirectUri(redirectUri, ErrorCode.INTERNAL_SERVER_ERROR.code)))
+                .build()
+        }
+    }
+
+    @ResponseStatus(HttpStatus.FOUND)
+    @PostMapping("apple/callback")
+    override fun appleCallback(
+        @RequestParam code: String,
+        @RequestParam(required = false) state: String?,
+        req: HttpServletRequest,
+    ): ResponseEntity<Unit> {
+        val redirectUri =
+            state
+                ?.takeIf { it.isNotBlank() }
+                ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8) }
+                ?.takeIf { isAllowedRedirect(it) }
+                ?: appleOAuthProperties.frontRedirectUri
+
+        return try {
+            val service = loginServiceRegistry.getService(OAuthProvider.APPLE)
+            val loginResult = service.login(code)
+            val accessTokenCookie = cookieGenerator.createAccessTokenCookie(req, loginResult.tokens.accessToken)
+            val refreshTokenCookie = cookieGenerator.createRefreshTokenCookie(req, loginResult.tokens.refreshToken)
+            log.info(
+                "Apple callback success: redirectUri={}, issuedCookies={}",
+                redirectUri,
+                listOf("accessToken", "refreshToken").joinToString(","),
+            )
+
+            ResponseEntity
+                .status(HttpStatus.FOUND)
+                .header(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate, max-age=0")
+                .header("Pragma", "no-cache")
+                .header("Expires", "0")
+                .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
+                .location(URI.create(redirectUri))
+                .build()
+        } catch (ex: BusinessException) {
+            log.info("Apple callback failed: code={}, redirectUri={}", ex.errorCode.code, redirectUri)
+            ResponseEntity
+                .status(HttpStatus.FOUND)
+                .location(URI.create(buildErrorRedirectUri(redirectUri, ex.errorCode.code)))
+                .build()
+        } catch (ex: Exception) {
+            log.error("Apple callback unexpected error: redirectUri={}", redirectUri, ex)
             ResponseEntity
                 .status(HttpStatus.FOUND)
                 .location(URI.create(buildErrorRedirectUri(redirectUri, ErrorCode.INTERNAL_SERVER_ERROR.code)))

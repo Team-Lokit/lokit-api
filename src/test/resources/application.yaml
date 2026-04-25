@@ -67,6 +67,14 @@ kakao:
     redirect-uri: http://localhost:8080/api/auth/kakao/callback
     front-redirect-uri: http://localhost:3000
 
+apple:
+    client-id: test-client-id
+    private-key-path: src/test/resources/keys/apple-test-private-key.p8
+    team-id: test-team-id
+    key-id: test-key-id
+    redirect-uri: http://localhost:8080/api/auth/apple/callback
+    front-redirect-uri: http://localhost:3000
+
 cookie:
     secure: false
 
