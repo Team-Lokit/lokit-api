@@ -94,6 +94,14 @@ kakao:
     redirect-uri: ${KAKAO_REDIRECT_URI}
     front-redirect-uri: ${KAKAO_FRONT_REDIRECT_URI}
 
+apple:
+    client-id: ${APPLE_CLIENT_ID}
+    team-id: ${APPLE_TEAM_ID}
+    key-id: ${APPLE_KEY_ID}
+    private-key-path: ${APPLE_PRIVATE_KEY_PATH}
+    redirect-uri: ${APPLE_REDIRECT_URI}
+    front-redirect-uri: ${APPLE_FRONT_REDIRECT_URI}
+
 cookie:
     secure: true
     domain: ${COOKIE_DOMAIN:}
