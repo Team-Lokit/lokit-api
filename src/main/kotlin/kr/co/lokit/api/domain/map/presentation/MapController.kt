@@ -26,7 +26,7 @@ class MapController(
     private val getMapUseCase: GetMapUseCase,
     private val searchLocationUseCase: SearchLocationUseCase,
 ) : MapApi {
-    @Deprecated("Legacy API (제거 필요)")
+    @Deprecated("Deprecated v1.0 API. X-API-VERSION=1.1 header를 사용하여 v1.1 API를 이용해주세요.")
     @GetMapping("me")
     override fun legacyGetMe(
         @CurrentUser user: User,

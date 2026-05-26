@@ -23,17 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam
 @Tag(name = "Map", description = "지도 API")
 interface MapApi {
     @Operation(
-        operationId = "getMapMeV1",
-        tags = ["Map (v1.0)"],
-        summary = "지도 ME 조회 (v1.0, 홈 + 사진 조회 통합)",
-        description = """
-            홈 정보와 지도 사진을 한 번에 조회합니다.
-
-            - 위치 정보, 앨범 목록, 바운딩 박스 (map/home 응답)
-            - 줌 레벨과 바운딩 박스 기반 사진/클러스터 (map/photos 응답)
-            - 두 API를 하나로 통합하여 네트워크 요청을 줄입니다.
-            - v1.0 응답 형식을 유지하는 레거시 API입니다.
-        """,
+        hidden = true,
     )
     @ApiResponses(
         value = [
@@ -90,7 +80,6 @@ interface MapApi {
 
     @Operation(
         operationId = "getMapMeV1_1",
-        tags = ["Map (v1.1)"],
         summary = "지도 ME 조회 (v1.1, 홈 + 사진 조회 통합)",
         description = """
             홈 정보와 지도 사진을 한 번에 조회합니다.
@@ -98,6 +87,8 @@ interface MapApi {
             - 위치 정보, 앨범 목록, 바운딩 박스 (map/home 응답)
             - 줌 레벨과 바운딩 박스 기반 사진/클러스터 (map/photos 응답)
             - 두 API를 하나로 통합하여 네트워크 요청을 줄입니다.
+            - v1.0.0은 Deprecated 상태인 기본 버전이며, X-API-VERSION 헤더 없이 호출 가능합니다.
+            - v1.1 응답 형식을 사용하려면 X-API-VERSION=1.1 헤더가 필요합니다.
             - v1.1 응답 형식을 사용합니다.
         """,
     )
