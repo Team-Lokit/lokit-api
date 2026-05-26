@@ -184,7 +184,7 @@ class MapQueryService(
         val (locationFuture, albumsFuture, photosFuture) =
             StructuredConcurrency.run { scope ->
                 Triple(
-                    scope.fork { mapClientPort.reverseGeocode(longitude, latitude) },
+                    scope.fork { mapClientPort.reverseGeocode(longitude, latitude) }, // TODO: 제거
                     scope.fork {
                         dbSemaphore.withPermit {
                             findAlbumsForCouple(context.coupleId)
@@ -204,12 +204,12 @@ class MapQueryService(
                 )
             }
 
-        val formattedLocation = formatLocation(locationFuture.get())
+        val formattedLocation = formatLocation(locationFuture.get()) // TODO: 제거
         val photosResponse = photosFuture.get()
         val albums = albumsFuture.get()
 
         return MapMeReadModel(
-            location = formattedLocation,
+            location = formattedLocation, // TODO: 제거
             boundingBox = bbox.toBoundingBoxReadModel(),
             albums = albums.toAlbumThumbnailsReadModels(),
             dataVersion = currentVersion,
