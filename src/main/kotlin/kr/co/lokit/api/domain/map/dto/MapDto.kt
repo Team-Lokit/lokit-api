@@ -253,9 +253,27 @@ data class HomeResponse(
 }
 
 @Schema(description = "지도 ME 응답 (홈 + 사진 조회 통합)")
-data class MapMeResponse(
+data class LegacyMapMeResponse(
     @Schema(description = "위치 정보")
     val location: LocationInfoResponse,
+    @Schema(description = "바운딩 박스")
+    val boundingBox: BoundingBoxResponse,
+    @Schema(description = "기록 수(전체 보기 사진 개수)")
+    val totalHistoryCount: Int,
+    @Schema(description = "앨범 하이라이트 사진들 (최대 4장)")
+    val albums: List<HomeResponse.Companion.AlbumThumbnails>,
+    @Schema(description = "데이터 버전 (사진 변경 시 증가, 프론트 캐싱에 사용)")
+    val dataVersion: Long = 0,
+    @Schema(description = "클러스터 목록 (줌 < 15일 때)")
+    val clusters: List<ClusterResponse>? = null,
+    @Schema(description = "개별 사진 목록 (줌 >= 15일 때)")
+    val photos: List<MapPhotoResponse>? = null,
+    @Schema(description = "내 프로필 이미지 URL", example = "https://example.com/profile.jpg")
+    val profileImageUrl: String?,
+)
+
+@Schema(description = "지도 ME 응답 (홈 + 사진 조회 통합)")
+data class MapMeResponse(
     @Schema(description = "바운딩 박스")
     val boundingBox: BoundingBoxResponse,
     @Schema(description = "기록 수(전체 보기 사진 개수)")

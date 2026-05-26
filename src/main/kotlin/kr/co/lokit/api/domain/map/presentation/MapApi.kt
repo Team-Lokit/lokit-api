@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import kr.co.lokit.api.domain.map.dto.AlbumMapInfoResponse
 import kr.co.lokit.api.domain.map.dto.ClusterPhotoResponse
+import kr.co.lokit.api.domain.map.dto.LegacyMapMeResponse
 import kr.co.lokit.api.domain.map.dto.LocationInfoResponse
 import kr.co.lokit.api.domain.map.dto.MapMeResponse
 import kr.co.lokit.api.domain.map.dto.PlaceSearchResponse
@@ -37,7 +38,71 @@ interface MapApi {
             ApiResponse(
                 responseCode = "200",
                 description = "조회 성공",
-                content = [Content(schema = Schema(implementation = MapMeResponse::class))],
+                content = [Content(schema = Schema(implementation = LegacyMapMeResponse::class))],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "잘못된 요청 파라미터",
+                content = [Content()],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "인증 필요",
+                content = [Content()],
+            ),
+        ],
+    )
+    fun legacyGetMe(
+        @Parameter(hidden = true) user: User,
+        @Parameter(
+            description = "경도",
+            example = "127.0276",
+            required = true,
+        )
+        @RequestParam longitude: Double,
+        @Parameter(
+            description = "위도",
+            example = "37.4979",
+            required = true,
+        )
+        @RequestParam latitude: Double,
+        @Parameter(
+            description = "줌 레벨(소수점 지원). 15 미만이면 클러스터링, 15 이상이면 개별 사진 반환",
+            example = "12.5",
+            required = true,
+        )
+        @RequestParam zoom: Double,
+        @Parameter(
+            description = "앨범 ID (선택). 지정 시 해당 앨범의 사진만 조회",
+            example = "1",
+            required = false,
+        )
+        @RequestParam albumId: Long?,
+        @Parameter(
+            description = "이전 응답의 dataVersion. 클라이언트 캐시 동기화 판단에 사용",
+            example = "3",
+            required = false,
+        )
+        @RequestParam lastDataVersion: Long?,
+    ): LegacyMapMeResponse
+
+    @Operation(
+        operationId = "getMapMe",
+        summary = "지도 ME 조회 (홈 + 사진 조회 통합)",
+        description = """
+            홈 정보와 지도 사진을 한 번에 조회합니다.
+
+            - 위치 정보, 앨범 목록, 바운딩 박스 (map/home 응답)
+            - 줌 레벨과 바운딩 박스 기반 사진/클러스터 (map/photos 응답)
+            - 두 API를 하나로 통합하여 네트워크 요청을 줄입니다.
+        """,
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "조회 성공",
+                content = [Content(schema = Schema(implementation = LegacyMapMeResponse::class))],
             ),
             ApiResponse(
                 responseCode = "400",

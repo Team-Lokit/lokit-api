@@ -163,7 +163,7 @@ value class AlbumThumbnails private constructor(
 }
 
 data class MapMeReadModel(
-    val location: LocationInfoReadModel,
+    val location: LocationInfoReadModel, // TODO: 제거
     val boundingBox: BoundingBoxReadModel,
     val totalHistoryCount: Int,
     val albums: AlbumThumbnails,
