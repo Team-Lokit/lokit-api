@@ -16,15 +16,27 @@ import kr.co.lokit.api.domain.map.dto.BoundingBoxResponse
 import kr.co.lokit.api.domain.map.dto.ClusterPhotoResponse
 import kr.co.lokit.api.domain.map.dto.ClusterResponse
 import kr.co.lokit.api.domain.map.dto.HomeResponse
+import kr.co.lokit.api.domain.map.dto.LegacyMapMeResponse
 import kr.co.lokit.api.domain.map.dto.LocationInfoResponse
 import kr.co.lokit.api.domain.map.dto.MapMeResponse
 import kr.co.lokit.api.domain.map.dto.MapPhotoResponse
 import kr.co.lokit.api.domain.map.dto.PlaceResponse
 import kr.co.lokit.api.domain.map.dto.PlaceSearchResponse
 
+fun MapMeReadModel.toLegacyResponse(): LegacyMapMeResponse =
+    LegacyMapMeResponse(
+        location = location.toResponse(),
+        boundingBox = boundingBox.toResponse(),
+        totalHistoryCount = totalHistoryCount,
+        albums = albums.asList().map { it.toResponse() },
+        dataVersion = dataVersion,
+        clusters = clusters?.asList()?.map { it.toResponse() },
+        photos = photos?.asList()?.map { it.toResponse() },
+        profileImageUrl = profileImageUrl,
+    )
+
 fun MapMeReadModel.toResponse(): MapMeResponse =
     MapMeResponse(
-        location = location.toResponse(),
         boundingBox = boundingBox.toResponse(),
         totalHistoryCount = totalHistoryCount,
         albums = albums.asList().map { it.toResponse() },

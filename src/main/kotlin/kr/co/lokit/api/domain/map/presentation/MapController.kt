@@ -6,9 +6,11 @@ import kr.co.lokit.api.domain.map.application.port.`in`.GetMapUseCase
 import kr.co.lokit.api.domain.map.application.port.`in`.SearchLocationUseCase
 import kr.co.lokit.api.domain.map.dto.AlbumMapInfoResponse
 import kr.co.lokit.api.domain.map.dto.ClusterPhotoResponse
+import kr.co.lokit.api.domain.map.dto.LegacyMapMeResponse
 import kr.co.lokit.api.domain.map.dto.LocationInfoResponse
 import kr.co.lokit.api.domain.map.dto.MapMeResponse
 import kr.co.lokit.api.domain.map.dto.PlaceSearchResponse
+import kr.co.lokit.api.domain.map.presentation.mapping.toLegacyResponse
 import kr.co.lokit.api.domain.map.presentation.mapping.toResponse
 import kr.co.lokit.api.domain.user.domain.User
 import org.springframework.security.access.prepost.PreAuthorize
@@ -24,7 +26,27 @@ class MapController(
     private val getMapUseCase: GetMapUseCase,
     private val searchLocationUseCase: SearchLocationUseCase,
 ) : MapApi {
+    @Deprecated("Deprecated v1.0 API. X-API-VERSION=1.1 header를 사용하여 v1.1 API를 이용해주세요.")
     @GetMapping("me")
+    override fun legacyGetMe(
+        @CurrentUser user: User,
+        @RequestParam longitude: Double,
+        @RequestParam latitude: Double,
+        @RequestParam zoom: Double,
+        @RequestParam(required = false) albumId: Long?,
+        @RequestParam(required = false) lastDataVersion: Long?,
+    ): LegacyMapMeResponse =
+        getMapUseCase
+            .getMe(
+                user,
+                longitude,
+                latitude,
+                zoom,
+                albumId,
+                lastDataVersion,
+            ).toLegacyResponse()
+
+    @GetMapping("me", version = "1.1")
     override fun getMe(
         @CurrentUser user: User,
         @RequestParam longitude: Double,
