@@ -122,7 +122,7 @@ class AuthController(
                 .header("Expires", "0")
                 .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-                .location(URI.create(redirectUri))
+                .location(URI.create(buildSuccessRedirectUri(redirectUri, loginResult.userId, loginResult.isNewUser)))
                 .build()
         } catch (ex: BusinessException) {
             log.info("Kakao callback failed: code={}, redirectUri={}", ex.errorCode.code, redirectUri)
@@ -171,7 +171,7 @@ class AuthController(
                 .header("Expires", "0")
                 .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-                .location(URI.create(redirectUri))
+                .location(URI.create(buildSuccessRedirectUri(redirectUri, loginResult.userId, loginResult.isNewUser)))
                 .build()
         } catch (ex: BusinessException) {
             log.info("Apple callback failed: code={}, redirectUri={}", ex.errorCode.code, redirectUri)
@@ -220,6 +220,18 @@ class AuthController(
         } catch (_: Exception) {
             false
         }
+
+    private fun buildSuccessRedirectUri(
+        redirectUri: String,
+        userId: Long,
+        isNewUser: Boolean,
+    ): String =
+        UriComponentsBuilder
+            .fromUriString(redirectUri)
+            .queryParam("user_id", userId)
+            .queryParam("is_new_user", isNewUser)
+            .build(true)
+            .toUriString()
 
     private fun buildErrorRedirectUri(
         redirectUri: String,
