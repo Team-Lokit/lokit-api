@@ -1,12 +1,12 @@
 package kr.co.lokit.api.domain.couple.application
 
-// import kr.co.lokit.api.config.cache.evictUserCoupleCache
 import kr.co.lokit.api.common.annotation.OptimisticRetry
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.common.exception.ErrorField
 import kr.co.lokit.api.common.exception.entityNotFound
 import kr.co.lokit.api.common.exception.errorDetailsOf
 import kr.co.lokit.api.config.cache.clearPermissionCaches
+import kr.co.lokit.api.config.cache.evictUserCoupleCache
 import kr.co.lokit.api.domain.couple.application.mapping.toCoupledStatusReadModel
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.couple.application.port.`in`.ReconnectCoupleUseCase
@@ -36,7 +36,7 @@ class CoupleReconnectService(
 
         val reconnected = coupleRepository.reconnect(targetCouple.id, userId)
 
-//        cacheManager.evictUserCoupleCache(userId, *reconnected.userIds.filter { it != userId }.toLongArray())
+        cacheManager.evictUserCoupleCache(userId, *reconnected.userIds.filter { it != userId }.toLongArray())
         evictPermissionCaches()
 
         val partnerId = reconnected.partnerIdFor(userId) ?: throw BusinessException.UserNotFoundException()

@@ -4,6 +4,7 @@ import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.common.exception.ErrorField
 import kr.co.lokit.api.common.exception.entityNotFound
 import kr.co.lokit.api.common.exception.errorDetailsOf
+import kr.co.lokit.api.config.cache.CacheNames
 import kr.co.lokit.api.domain.album.infrastructure.AlbumEntity
 import kr.co.lokit.api.domain.album.infrastructure.AlbumJpaRepository
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
@@ -12,6 +13,7 @@ import kr.co.lokit.api.domain.couple.infrastructure.mapping.toDomain
 import kr.co.lokit.api.domain.couple.infrastructure.mapping.toEntity
 import kr.co.lokit.api.domain.user.domain.User
 import kr.co.lokit.api.domain.user.infrastructure.UserJpaRepository
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -97,7 +99,7 @@ class JpaCoupleRepository(
         return coupleEntity.toDomain()
     }
 
-    //    @Cacheable(cacheNames = [CacheNames.USER_COUPLE], key = "#userId", sync = true)
+    @Cacheable(cacheNames = [CacheNames.USER_COUPLE], key = "#userId", sync = true)
     @Transactional(readOnly = true)
     override fun findByUserId(userId: Long): Couple? =
         coupleJpaRepository
