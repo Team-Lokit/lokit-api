@@ -288,4 +288,6 @@ data class MapMeResponse(
     val photos: List<MapPhotoResponse>? = null,
     @Schema(description = "내 프로필 이미지 URL", example = "https://example.com/profile.jpg")
     val profileImageUrl: String?,
+    @Schema(description = "내 회원 ID", example = "1")
+    val userId: Long,
 )

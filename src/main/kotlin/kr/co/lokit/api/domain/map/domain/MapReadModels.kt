@@ -171,4 +171,5 @@ data class MapMeReadModel(
     val clusters: Clusters?,
     val photos: MapPhotos?,
     val profileImageUrl: String?,
+    val userId: Long
 )

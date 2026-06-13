@@ -73,6 +73,7 @@ class MapControllerTest {
             clusters = Clusters.empty(),
             photos = null,
             profileImageUrl = "https://example.com/profile.jpg",
+            userId = 1L,
         )
 
     @Test
