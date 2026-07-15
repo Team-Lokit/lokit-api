@@ -20,6 +20,7 @@ import org.mockito.Mockito.timeout
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.cache.CacheManager
 import org.springframework.cache.caffeine.CaffeineCache
@@ -38,10 +39,14 @@ class MapPhotosCacheServiceTest {
     @org.mockito.Mock
     lateinit var cacheManager: CacheManager
 
+    lateinit var mapCells: CaffeineCache
+
     lateinit var service: MapPhotosCacheService
 
     @BeforeEach
     fun setUp() {
+        mapCells = CaffeineCache(CacheNames.MAP_CELLS, Caffeine.newBuilder().build())
+        lenient().`when`(cacheManager.getCache(CacheNames.MAP_CELLS)).thenReturn(mapCells)
         service = MapPhotosCacheService(mapQueryPort, cacheManager, PixelBasedClusterBoundaryMergeStrategy())
     }
 
@@ -135,15 +140,15 @@ class MapPhotosCacheServiceTest {
     }
 
     @Test
-    fun `getClusteredPhotos queries raw photos and returns mapped clusters`() {
+    fun `getClusteredPhotos queries missing cells and returns mapped clusters`() {
         val bbox = BBox(126.99, 37.49, 127.01, 37.51)
         val now = LocalDateTime.now()
         `when`(
             mapQueryPort.findPhotosWithinBBox(
-                west = eq(bbox.west),
-                south = eq(bbox.south),
-                east = eq(bbox.east),
-                north = eq(bbox.north),
+                west = anyDouble(),
+                south = anyDouble(),
+                east = anyDouble(),
+                north = anyDouble(),
                 coupleId = eq(1L),
                 albumId = eq(2L),
             ),
@@ -159,10 +164,10 @@ class MapPhotosCacheServiceTest {
         assertNotNull(result.clusters)
         assertEquals(2, result.clusters!!.asList().sumOf { it.count })
         verify(mapQueryPort).findPhotosWithinBBox(
-            west = eq(bbox.west),
-            south = eq(bbox.south),
-            east = eq(bbox.east),
-            north = eq(bbox.north),
+            west = anyDouble(),
+            south = anyDouble(),
+            east = anyDouble(),
+            north = anyDouble(),
             coupleId = eq(1L),
             albumId = eq(2L),
         )
@@ -177,10 +182,10 @@ class MapPhotosCacheServiceTest {
         val now = LocalDateTime.now()
         `when`(
             mapQueryPort.findPhotosWithinBBox(
-                west = eq(bbox.west),
-                south = eq(bbox.south),
-                east = eq(bbox.east),
-                north = eq(bbox.north),
+                west = anyDouble(),
+                south = anyDouble(),
+                east = anyDouble(),
+                north = anyDouble(),
                 coupleId = eq(1L),
                 albumId = isNull(),
             ),
@@ -216,17 +221,17 @@ class MapPhotosCacheServiceTest {
         val now = LocalDateTime.now()
         `when`(
             mapQueryPort.findPhotosWithinBBox(
-                west = eq(bbox.west),
-                south = eq(bbox.south),
-                east = eq(bbox.east),
-                north = eq(bbox.north),
+                west = anyDouble(),
+                south = anyDouble(),
+                east = anyDouble(),
+                north = anyDouble(),
                 coupleId = eq(1L),
                 albumId = isNull(),
             ),
         ).thenReturn(
             listOf(
                 PhotoProjection(id = 1L, url = "a.jpg", longitude = 127.0, latitude = 37.5, takenAt = now),
-                PhotoProjection(id = 2L, url = "b.jpg", longitude = 127.1, latitude = 37.6, takenAt = now.minusMinutes(1)),
+                PhotoProjection(id = 2L, url = "b.jpg", longitude = 127.005, latitude = 37.505, takenAt = now.minusMinutes(1)),
             ),
         )
 
@@ -249,6 +254,61 @@ class MapPhotosCacheServiceTest {
 
         assertNotNull(result.clusters)
         assertEquals(2, result.clusters!!.asList().sumOf { it.count })
+    }
+
+    @Test
+    fun `getClusteredPhotos reuses map cell cache when dataVersion matches`() {
+        val bbox = BBox(126.99, 37.49, 127.01, 37.51)
+        val now = LocalDateTime.now()
+        `when`(
+            mapQueryPort.findPhotosWithinBBox(
+                west = anyDouble(),
+                south = anyDouble(),
+                east = anyDouble(),
+                north = anyDouble(),
+                coupleId = eq(1L),
+                albumId = isNull(),
+            ),
+        ).thenReturn(listOf(PhotoProjection(id = 1L, url = "a.jpg", longitude = 127.0, latitude = 37.5, takenAt = now)))
+
+        service.getClusteredPhotos(14.0, bbox, 1L, null, canReuseCellCache = true)
+        service.getClusteredPhotos(14.0, bbox, 1L, null, canReuseCellCache = true)
+
+        verify(mapQueryPort, times(1)).findPhotosWithinBBox(
+            west = anyDouble(),
+            south = anyDouble(),
+            east = anyDouble(),
+            north = anyDouble(),
+            coupleId = eq(1L),
+            albumId = isNull(),
+        )
+    }
+
+    @Test
+    fun `getClusteredPhotos bypasses map cell cache when dataVersion changed`() {
+        val bbox = BBox(126.99, 37.49, 127.01, 37.51)
+        `when`(
+            mapQueryPort.findPhotosWithinBBox(
+                west = anyDouble(),
+                south = anyDouble(),
+                east = anyDouble(),
+                north = anyDouble(),
+                coupleId = eq(1L),
+                albumId = isNull(),
+            ),
+        ).thenReturn(emptyList())
+
+        service.getClusteredPhotos(14.0, bbox, 1L, null, canReuseCellCache = true)
+        service.getClusteredPhotos(14.0, bbox, 1L, null, canReuseCellCache = false)
+
+        verify(mapQueryPort, times(2)).findPhotosWithinBBox(
+            west = anyDouble(),
+            south = anyDouble(),
+            east = anyDouble(),
+            north = anyDouble(),
+            coupleId = eq(1L),
+            albumId = isNull(),
+        )
     }
 
     @Test

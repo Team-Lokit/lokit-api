@@ -24,7 +24,7 @@ class JpaRefreshTokenRepository(
             )
         }
 
-    override fun replace(
+    override fun save(
         userId: Long,
         token: String,
         expiresAt: LocalDateTime,
@@ -35,11 +35,30 @@ class JpaRefreshTokenRepository(
                     errors = errorDetailsOf(ErrorField.USER_ID to userId),
                 )
 
-        refreshTokenJpaRepository.deleteByUserId(userId)
         refreshTokenJpaRepository.save(
             RefreshTokenEntity(
                 tokenHash = refreshTokenHasher.hash(token),
                 user = userEntity,
+                expiresAt = expiresAt,
+            ),
+        )
+    }
+
+    override fun rotate(
+        oldToken: String,
+        newToken: String,
+        expiresAt: LocalDateTime,
+    ) {
+        val oldTokenHash = refreshTokenHasher.hash(oldToken)
+        val oldRefreshTokenEntity =
+            refreshTokenJpaRepository.findByTokenHash(oldTokenHash)
+                ?: return
+
+        refreshTokenJpaRepository.deleteByTokenHash(oldTokenHash)
+        refreshTokenJpaRepository.save(
+            RefreshTokenEntity(
+                tokenHash = refreshTokenHasher.hash(newToken),
+                user = oldRefreshTokenEntity.user,
                 expiresAt = expiresAt,
             ),
         )

@@ -57,36 +57,36 @@ class CacheConfig {
                         .maximumSize(80)
                         .build(),
                 ),
-//                CaffeineCache(
-//                    CacheNames.ALBUM_COUPLE,
-//                    Caffeine
-//                        .newBuilder()
-//                        .expireAfterWrite(10, TimeUnit.MINUTES)
-//                        .maximumSize(120)
-//                        .build(),
-//                ),
-//                CaffeineCache(
-//                    CacheNames.USER_COUPLE,
-//                    Caffeine
-//                        .newBuilder()
-//                        .expireAfterWrite(10, TimeUnit.MINUTES)
-//                        .maximumSize(120)
-//                        .build(),
-//                ),
-//                CaffeineCache(
-//                    CacheNames.COUPLE_ALBUMS,
-//                    Caffeine
-//                        .newBuilder()
-//                        .expireAfterWrite(3, TimeUnit.MINUTES)
-//                        .maximumSize(120)
-//                        .build(),
-//                ),
+                CaffeineCache(
+                    CacheNames.ALBUM_COUPLE,
+                    Caffeine
+                        .newBuilder()
+                        .expireAfterWrite(10, TimeUnit.MINUTES)
+                        .maximumSize(120)
+                        .build(),
+                ),
+                CaffeineCache(
+                    CacheNames.USER_COUPLE,
+                    Caffeine
+                        .newBuilder()
+                        .expireAfterWrite(10, TimeUnit.MINUTES)
+                        .maximumSize(200)
+                        .build(),
+                ),
+                CaffeineCache(
+                    CacheNames.COUPLE_ALBUMS,
+                    Caffeine
+                        .newBuilder()
+                        .expireAfterWrite(3, TimeUnit.MINUTES)
+                        .maximumSize(200)
+                        .build(),
+                ),
                 CaffeineCache(
                     CacheNames.MAP_PHOTOS,
                     Caffeine
                         .newBuilder()
                         .expireAfterWrite(10, TimeUnit.MINUTES)
-                        .maximumSize(250)
+                        .maximumSize(400)
                         .build(),
                 ),
                 CaffeineCache(
@@ -94,7 +94,7 @@ class CacheConfig {
                     Caffeine
                         .newBuilder()
                         .expireAfterWrite(10, TimeUnit.MINUTES)
-                        .maximumSize(100)
+                        .maximumSize(400)
                         .build(),
                 ),
                 CaffeineCache(

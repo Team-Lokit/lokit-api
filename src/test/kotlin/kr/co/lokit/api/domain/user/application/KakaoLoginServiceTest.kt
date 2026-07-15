@@ -25,7 +25,6 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.whenever
 import org.mockito.quality.Strictness
-import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
@@ -122,7 +121,7 @@ class KakaoLoginServiceTest {
     }
 
     @Test
-    fun `토큰 생성 시 기존 리프레시 토큰을 교체한다`() {
+    fun `토큰 생성 시 리프레시 토큰을 저장한다`() {
         setupOAuthClient()
         val existingUser = User(id = 1L, email = "test@test.com", name = "테스트")
 
@@ -131,7 +130,7 @@ class KakaoLoginServiceTest {
 
         kakaoLoginService.login("auth-code")
 
-        verify(refreshTokenRepository).replace(eq(1L), eq("refresh-token"), any())
+        verify(refreshTokenRepository).save(eq(1L), eq("refresh-token"), any())
     }
 
     @Test
