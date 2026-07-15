@@ -1,7 +1,6 @@
 package kr.co.lokit.api.domain.map.application
 
 import kr.co.lokit.api.common.concurrency.StructuredConcurrency
-import kr.co.lokit.api.common.concurrency.withPermit
 import kr.co.lokit.api.domain.album.application.port.AlbumRepositoryPort
 import kr.co.lokit.api.domain.album.domain.Album
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
@@ -33,7 +32,6 @@ import kr.co.lokit.api.domain.map.domain.ThumbnailUrls
 import kr.co.lokit.api.domain.user.domain.User
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.util.concurrent.Semaphore
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
@@ -53,8 +51,6 @@ class MapQueryService(
         val coupleId: Long?,
         val albumId: Long?,
     )
-
-    private val dbSemaphore = Semaphore(6)
 
     private companion object {
         const val GRID_ZOOM_STEPS = 2.0
@@ -186,20 +182,16 @@ class MapQueryService(
             StructuredConcurrency.run { scope ->
                 Pair(
                     scope.fork {
-                        dbSemaphore.withPermit {
-                            findAlbumsForCouple(context.coupleId)
-                        }
+                        findAlbumsForCouple(context.coupleId)
                     },
                     scope.fork {
-                        dbSemaphore.withPermit {
-                            getPhotos(
-                                zoom = mapZoom.level,
-                                bbox = requestedBbox,
-                                context = context,
-                                lastDataVersion = lastDataVersion,
-                                currentDataVersion = currentVersion,
-                            )
-                        }
+                        getPhotos(
+                            zoom = mapZoom.level,
+                            bbox = requestedBbox,
+                            context = context,
+                            lastDataVersion = lastDataVersion,
+                            currentDataVersion = currentVersion,
+                        )
                     },
                 )
             }

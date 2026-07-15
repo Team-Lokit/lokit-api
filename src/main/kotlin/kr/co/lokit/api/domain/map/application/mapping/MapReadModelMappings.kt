@@ -1,26 +1,13 @@
 package kr.co.lokit.api.domain.map.application.mapping
 
 import kr.co.lokit.api.domain.map.application.port.ClusterPhotoProjection
-import kr.co.lokit.api.domain.map.application.port.ClusterProjection
 import kr.co.lokit.api.domain.map.application.port.PhotoProjection
 import kr.co.lokit.api.domain.map.domain.AlbumBounds
 import kr.co.lokit.api.domain.map.domain.AlbumMapInfoReadModel
 import kr.co.lokit.api.domain.map.domain.BBox
 import kr.co.lokit.api.domain.map.domain.BoundingBoxReadModel
-import kr.co.lokit.api.domain.map.domain.ClusterId
 import kr.co.lokit.api.domain.map.domain.ClusterPhotoReadModel
-import kr.co.lokit.api.domain.map.domain.ClusterReadModel
 import kr.co.lokit.api.domain.map.domain.MapPhotoReadModel
-
-fun ClusterProjection.toClusterReadModel(zoom: Int): ClusterReadModel =
-    ClusterReadModel(
-        clusterId = ClusterId.format(zoom, cellX, cellY),
-        count = count,
-        thumbnailUrl = thumbnailUrl,
-        longitude = centerLongitude,
-        latitude = centerLatitude,
-        takenAt = takenAt,
-    )
 
 fun PhotoProjection.toMapPhotoReadModel(): MapPhotoReadModel =
     MapPhotoReadModel(
