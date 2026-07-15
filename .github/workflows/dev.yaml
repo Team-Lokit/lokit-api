@@ -231,7 +231,7 @@ jobs:
                     username: ${{ secrets.DEV_GCP_USERNAME }}
                     key: ${{ secrets.DEV_GCP_SSH_KEY }}
                     script: |
-                        cd /home/lokit-api
+                        cd /lokit-api
                         sudo git pull origin develop
                         sudo docker compose up --build -d
                         sudo docker image prune -f
