@@ -31,17 +31,9 @@ spring:
     sql:
         init:
             mode: never
-    task:
-        execution:
-            pool:
-                core-size: 4
-                max-size: 24
 
 server:
     tomcat:
-        threads:
-            max: 80
-            min-spare: 8
         max-connections: 1000
         accept-count: 200
         connection-timeout: 10s

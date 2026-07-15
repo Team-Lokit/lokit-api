@@ -6,6 +6,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 data class BBox(
     val west: Double,
@@ -174,7 +175,7 @@ object ClusterId {
     ): String {
         if (!isValid(clusterId)) return clusterId
         if (clusterId.contains("_mz")) return clusterId
-        val encoded = (mergeZoom * MERGE_ZOOM_SCALE).toInt().coerceAtLeast(0)
+        val encoded = (mergeZoom * MERGE_ZOOM_SCALE).roundToInt().coerceAtLeast(0)
         return "${clusterId}_mz$encoded"
     }
 

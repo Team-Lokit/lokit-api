@@ -1,7 +1,6 @@
 package kr.co.lokit.api.domain.map.application
 
 import kr.co.lokit.api.common.concurrency.StructuredConcurrency
-import kr.co.lokit.api.common.concurrency.withPermit
 import kr.co.lokit.api.domain.album.application.port.AlbumRepositoryPort
 import kr.co.lokit.api.domain.album.domain.Album
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
@@ -13,12 +12,28 @@ import kr.co.lokit.api.domain.map.application.port.MapClientPort
 import kr.co.lokit.api.domain.map.application.port.MapQueryPort
 import kr.co.lokit.api.domain.map.application.port.`in`.GetMapUseCase
 import kr.co.lokit.api.domain.map.application.port.`in`.SearchLocationUseCase
-import kr.co.lokit.api.domain.map.domain.*
+import kr.co.lokit.api.domain.map.domain.AlbumMapInfoReadModel
+import kr.co.lokit.api.domain.map.domain.AlbumThumbnails
+import kr.co.lokit.api.domain.map.domain.AlbumThumbnailsReadModel
+import kr.co.lokit.api.domain.map.domain.BBox
+import kr.co.lokit.api.domain.map.domain.BoundsIdType
+import kr.co.lokit.api.domain.map.domain.ClusterId
+import kr.co.lokit.api.domain.map.domain.ClusterPhotos
+import kr.co.lokit.api.domain.map.domain.Clusters
+import kr.co.lokit.api.domain.map.domain.GridValues
+import kr.co.lokit.api.domain.map.domain.LocationInfoReadModel
+import kr.co.lokit.api.domain.map.domain.MapMeReadModel
+import kr.co.lokit.api.domain.map.domain.MapPhotos
+import kr.co.lokit.api.domain.map.domain.MapPhotosReadModel
+import kr.co.lokit.api.domain.map.domain.MapZoom
+import kr.co.lokit.api.domain.map.domain.MercatorProjection
+import kr.co.lokit.api.domain.map.domain.PlaceSearchReadModel
+import kr.co.lokit.api.domain.map.domain.ThumbnailUrls
 import kr.co.lokit.api.domain.user.domain.User
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.util.concurrent.Semaphore
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 @Service
 class MapQueryService(
@@ -37,7 +52,9 @@ class MapQueryService(
         val albumId: Long?,
     )
 
-    private val dbSemaphore = Semaphore(6)
+    private companion object {
+        const val GRID_ZOOM_STEPS = 2.0
+    }
 
     private fun getPhotos(
         zoom: Double,
@@ -80,13 +97,12 @@ class MapQueryService(
             return ClusterPhotos.empty()
         }
         val parsedClusterId = ClusterId.parseDetailed(clusterId)
-        val gridCell =
-            kr.co.lokit.api.domain.map.domain.GridCell(
-                parsedClusterId.zoom,
-                parsedClusterId.cellX,
-                parsedClusterId.cellY,
-            )
-        val expandedBBox = expandedClusterSearchBBox(gridCell) ?: return ClusterPhotos.empty()
+        val rawMergeZoom = parsedClusterId.mergeZoom ?: parsedClusterId.zoom.toDouble()
+        val gridZoom = (rawMergeZoom * GRID_ZOOM_STEPS).roundToInt() / GRID_ZOOM_STEPS
+        val gridSize = GridValues.getGridSize(gridZoom)
+        val expandedBBox =
+            expandedClusterSearchBBox(parsedClusterId.cellX, parsedClusterId.cellY, gridSize)
+                ?: return ClusterPhotos.empty()
         val photos =
             mapQueryPort.findPhotosInGridCell(
                 west = expandedBBox.west,
@@ -99,7 +115,6 @@ class MapQueryService(
             return ClusterPhotos.empty()
         }
 
-        val gridSize = GridValues.getGridSize(gridCell.zoom)
         val members =
             photos.map { photo ->
                 val cell =
@@ -115,7 +130,7 @@ class MapQueryService(
             }
         val memberPhotoIds =
             clusterBoundaryMergeStrategy.resolveClusterPhotoIds(
-                zoom = parsedClusterId.mergeZoom ?: parsedClusterId.zoom.toDouble(),
+                zoom = gridZoom,
                 photos = members,
                 targetClusterId = clusterId,
             )
@@ -150,51 +165,42 @@ class MapQueryService(
         albumId: Long?,
         lastDataVersion: Long?,
     ): MapMeReadModel {
-        val bbox =
-            BBox
-                .fromCenter(MapZoom.from(zoom).level, longitude, latitude)
-                .clampToKorea() ?: BBox.KOREA_BOUNDS
-
         val mapZoom = MapZoom.from(zoom)
+        val requestedBbox = BBox.fromCenter(mapZoom.level, longitude, latitude)
+        val displayBbox = requestedBbox.clampToKorea() ?: requestedBbox
+
         val context = resolveViewerContext(userId = user.id, albumId = albumId)
         val currentVersion =
             mapPhotosCacheService.getDataVersion(
                 zoom = mapZoom.level,
-                bbox = bbox,
+                bbox = displayBbox,
                 coupleId = context.coupleId,
                 albumId = context.albumId,
             )
 
-        val (locationFuture, albumsFuture, photosFuture) =
+        val (albumsFuture, photosFuture) =
             StructuredConcurrency.run { scope ->
-                Triple(
-                    scope.fork { mapClientPort.reverseGeocode(longitude, latitude) }, // TODO: 제거
+                Pair(
                     scope.fork {
-                        dbSemaphore.withPermit {
-                            findAlbumsForCouple(context.coupleId)
-                        }
+                        findAlbumsForCouple(context.coupleId)
                     },
                     scope.fork {
-                        dbSemaphore.withPermit {
-                            getPhotos(
-                                zoom = mapZoom.level,
-                                bbox = bbox,
-                                context = context,
-                                lastDataVersion = lastDataVersion,
-                                currentDataVersion = currentVersion,
-                            )
-                        }
+                        getPhotos(
+                            zoom = mapZoom.level,
+                            bbox = requestedBbox,
+                            context = context,
+                            lastDataVersion = lastDataVersion,
+                            currentDataVersion = currentVersion,
+                        )
                     },
                 )
             }
 
-        val formattedLocation = formatLocation(locationFuture.get()) // TODO: 제거
         val photosResponse = photosFuture.get()
         val albums = albumsFuture.get()
 
         return MapMeReadModel(
-            location = formattedLocation, // TODO: 제거
-            boundingBox = bbox.toBoundingBoxReadModel(),
+            boundingBox = displayBbox.toBoundingBoxReadModel(),
             albums = albums.toAlbumThumbnailsReadModels(),
             dataVersion = currentVersion,
             clusters = photosResponse.clusters,
@@ -261,20 +267,20 @@ class MapQueryService(
         coupleId: Long?,
     ): Boolean = userId != null && coupleId == null
 
-    private fun expandedClusterSearchBBox(cell: kr.co.lokit.api.domain.map.domain.GridCell): BBox? {
-        val sw =
-            kr.co.lokit.api.domain.map.domain
-                .GridCell(cell.zoom, cell.cellX - 1, cell.cellY - 1)
-                .toBBox()
-        val ne =
-            kr.co.lokit.api.domain.map.domain
-                .GridCell(cell.zoom, cell.cellX + 1, cell.cellY + 1)
-                .toBBox()
+    private fun expandedClusterSearchBBox(
+        cellX: Long,
+        cellY: Long,
+        gridSize: Double,
+    ): BBox? {
+        val westM = (cellX - 1) * gridSize
+        val southM = (cellY - 1) * gridSize
+        val eastM = (cellX + 2) * gridSize
+        val northM = (cellY + 2) * gridSize
         return BBox(
-            west = sw.west,
-            south = sw.south,
-            east = ne.east,
-            north = ne.north,
+            west = MercatorProjection.metersToLongitude(westM),
+            south = MercatorProjection.metersToLatitude(southM),
+            east = MercatorProjection.metersToLongitude(eastM),
+            north = MercatorProjection.metersToLatitude(northM),
         ).clampToKorea()
     }
 
