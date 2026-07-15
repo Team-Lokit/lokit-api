@@ -13,23 +13,7 @@ import kr.co.lokit.api.domain.map.application.port.MapClientPort
 import kr.co.lokit.api.domain.map.application.port.MapQueryPort
 import kr.co.lokit.api.domain.map.application.port.`in`.GetMapUseCase
 import kr.co.lokit.api.domain.map.application.port.`in`.SearchLocationUseCase
-import kr.co.lokit.api.domain.map.domain.AlbumMapInfoReadModel
-import kr.co.lokit.api.domain.map.domain.AlbumThumbnails
-import kr.co.lokit.api.domain.map.domain.AlbumThumbnailsReadModel
-import kr.co.lokit.api.domain.map.domain.BBox
-import kr.co.lokit.api.domain.map.domain.BoundsIdType
-import kr.co.lokit.api.domain.map.domain.ClusterId
-import kr.co.lokit.api.domain.map.domain.ClusterPhotos
-import kr.co.lokit.api.domain.map.domain.Clusters
-import kr.co.lokit.api.domain.map.domain.GridValues
-import kr.co.lokit.api.domain.map.domain.LocationInfoReadModel
-import kr.co.lokit.api.domain.map.domain.MapMeReadModel
-import kr.co.lokit.api.domain.map.domain.MapPhotos
-import kr.co.lokit.api.domain.map.domain.MapPhotosReadModel
-import kr.co.lokit.api.domain.map.domain.MapZoom
-import kr.co.lokit.api.domain.map.domain.MercatorProjection
-import kr.co.lokit.api.domain.map.domain.PlaceSearchReadModel
-import kr.co.lokit.api.domain.map.domain.ThumbnailUrls
+import kr.co.lokit.api.domain.map.domain.*
 import kr.co.lokit.api.domain.user.domain.User
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -217,6 +201,7 @@ class MapQueryService(
             photos = photosResponse.photos,
             totalHistoryCount = albumRepository.photoCountSumByUserId(user.id),
             profileImageUrl = user.profileImageUrl,
+            userId = user.id,
         )
     }
 

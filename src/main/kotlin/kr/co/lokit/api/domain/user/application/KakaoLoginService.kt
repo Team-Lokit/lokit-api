@@ -49,10 +49,12 @@ class KakaoLoginService(
 
         val loginResult =
             lockManager.withLock(key = User.emailLockKey(email), operation = {
-                val loadedUser = userRepository.findByEmail(email)
+                val (loadedUser, isNew) = userRepository.findByEmail(email)
+                    ?.let { it to false }
+                    ?: (userRepository.save(User(email = email, name = User.defaultNicknameFor(email))) to true)
                 val recovered = reactivateIfNeeded(loadedUser)
                 createCoupleUseCase.createIfNone(Couple(name = Couple.DEFAULT_COUPLE_NAME), loadedUser.id)
-                LoginLoadResult(user = loadedUser.recoveredIf(recovered), recovered = recovered)
+                LoginLoadResult(user = loadedUser.recoveredIf(recovered), recovered = recovered, isNew = isNew)
             })
 
         if (loginResult.recovered) {
@@ -63,6 +65,7 @@ class KakaoLoginService(
         return LoginResult(
             userId = loginResult.user.id,
             tokens = generateTokens(loginResult.user),
+            isNewUser = loginResult.isNew,
         )
     }
 
@@ -105,5 +108,6 @@ class KakaoLoginService(
     private data class LoginLoadResult(
         val user: User,
         val recovered: Boolean,
+        val isNew: Boolean,
     )
 }
