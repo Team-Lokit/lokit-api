@@ -10,9 +10,15 @@ data class RefreshTokenRecord(
 interface RefreshTokenRepositoryPort {
     fun findByToken(token: String): RefreshTokenRecord?
 
-    fun replace(
+    fun save(
         userId: Long,
         token: String,
+        expiresAt: LocalDateTime,
+    )
+
+    fun rotate(
+        oldToken: String,
+        newToken: String,
         expiresAt: LocalDateTime,
     )
 

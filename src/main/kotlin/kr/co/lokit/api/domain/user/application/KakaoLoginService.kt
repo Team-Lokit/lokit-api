@@ -90,7 +90,7 @@ class KakaoLoginService(
                 jwtTokenProvider.getRefreshTokenExpirationMillis() / 1000,
             )
 
-        refreshTokenRepository.replace(
+        refreshTokenRepository.save(
             userId = user.id,
             token = refreshToken,
             expiresAt = expiresAt,
