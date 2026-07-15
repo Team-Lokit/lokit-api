@@ -6,6 +6,7 @@ import kr.co.lokit.api.config.cache.CachePolicy
 import kr.co.lokit.api.domain.map.application.mapping.toMapPhotoReadModel
 import kr.co.lokit.api.domain.map.application.port.MapQueryPort
 import kr.co.lokit.api.domain.map.domain.BBox
+import kr.co.lokit.api.domain.map.domain.CellWindow
 import kr.co.lokit.api.domain.map.domain.ClusterId
 import kr.co.lokit.api.domain.map.domain.ClusterReadModel
 import kr.co.lokit.api.domain.map.domain.Clusters
@@ -31,7 +32,7 @@ class MapPhotosCacheService(
     private val clusterBoundaryMergeStrategy: ClusterBoundaryMergeStrategy,
 ) {
     data class CachedCell(
-        val response: ClusterReadModel?,
+        val responses: List<ClusterReadModel>,
     )
 
     private val prefetchSemaphore = Semaphore(CachePolicy.MAP_PREFETCH_CONCURRENCY)
@@ -41,6 +42,7 @@ class MapPhotosCacheService(
     fun evictForCouple(coupleId: Long) {
         mutationTracker.evictForCouple(coupleId)
         evictCoupleEntries(CacheNames.MAP_PHOTOS, coupleId)
+        evictCoupleEntries(CacheNames.MAP_CELLS, coupleId)
         viewportTracker.clearForCouple(coupleId)
     }
 
@@ -68,50 +70,31 @@ class MapPhotosCacheService(
     ) {
         mutationTracker.recordMutation(coupleId, albumId, longitude, latitude)
         evictIndividualEntriesForPoint(coupleId, albumId, longitude, latitude)
+        evictCellEntriesForPoint(coupleId, albumId, longitude, latitude)
         viewportTracker.clearForCouple(coupleId)
     }
 
-    @Suppress("UNUSED_PARAMETER")
     fun getClusteredPhotos(
         zoom: Double,
         bbox: BBox,
         coupleId: Long?,
         albumId: Long?,
         canReuseCellCache: Boolean = true,
-    ): MapPhotosReadModel = queryRawPoiClusters(zoom, bbox, coupleId, albumId)
+    ): MapPhotosReadModel = queryRawPoiClusters(zoom, bbox, coupleId, albumId, canReuseCellCache)
 
     private fun queryRawPoiClusters(
         zoom: Double,
         bbox: BBox,
         coupleId: Long?,
         albumId: Long?,
+        canReuseCellCache: Boolean,
     ): MapPhotosReadModel {
         val discreteZoom = floor(zoom).toInt()
         val clusterGridSize = GridValues.getGridSize(discreteZoom)
         val prefetchGridSize = clusterGridSize
         val sequence = mutationTracker.currentSequence(coupleId)
         val requestedWindow = MapGridIndex.toCellWindow(bbox, prefetchGridSize)
-
-        val clusters =
-            mapQueryPort
-                .findPhotosWithinBBox(
-                    west = bbox.west,
-                    south = bbox.south,
-                    east = bbox.east,
-                    north = bbox.north,
-                    coupleId = coupleId,
-                    albumId = albumId,
-                ).map { photo ->
-                    val (cellX, cellY) = MapGridIndex.toCell(photo.longitude, photo.latitude, clusterGridSize)
-                    ClusterReadModel(
-                        clusterId = ClusterId.format(discreteZoom, cellX, cellY),
-                        count = 1,
-                        thumbnailUrl = photo.url,
-                        longitude = photo.longitude,
-                        latitude = photo.latitude,
-                        takenAt = photo.takenAt,
-                    )
-                }
+        val clusters = getCellClusters(discreteZoom, clusterGridSize, requestedWindow, coupleId, albumId, canReuseCellCache)
 
         val prefetchCoords =
             viewportTracker.directionalPrefetchCells(
@@ -124,6 +107,7 @@ class MapPhotosCacheService(
             )
 
         scheduleRawPrefetch(
+            zoom = discreteZoom,
             gridSize = prefetchGridSize,
             coupleId = coupleId,
             albumId = albumId,
@@ -143,6 +127,7 @@ class MapPhotosCacheService(
     }
 
     private fun scheduleRawPrefetch(
+        zoom: Int,
         gridSize: Double,
         coupleId: Long?,
         albumId: Long?,
@@ -161,15 +146,20 @@ class MapPhotosCacheService(
                 if (coupleId != null && mutationTracker.currentSequence(coupleId) != sequence) {
                     return@startVirtualThread
                 }
-                val bounds = MapGridIndex.toMeterBounds(coords, gridSize)
-
-                mapQueryPort.findPhotosWithinBBox(
-                    west = MercatorProjection.metersToLongitude(bounds.west),
-                    south = MercatorProjection.metersToLatitude(bounds.south),
-                    east = MercatorProjection.metersToLongitude(bounds.east),
-                    north = MercatorProjection.metersToLatitude(bounds.north),
+                val prefetchWindow =
+                    CellWindow(
+                        xMin = coords.minOf { it.first },
+                        xMax = coords.maxOf { it.first },
+                        yMin = coords.minOf { it.second },
+                        yMax = coords.maxOf { it.second },
+                    )
+                getCellClusters(
+                    zoom = zoom,
+                    gridSize = gridSize,
+                    window = prefetchWindow,
                     coupleId = coupleId,
                     albumId = albumId,
+                    canReuseCellCache = true,
                 )
             } finally {
                 prefetchSemaphore.release()
@@ -225,6 +215,100 @@ class MapPhotosCacheService(
         if (keysToInvalidate.isNotEmpty()) {
             cache.nativeCache.invalidateAll(keysToInvalidate)
         }
+    }
+
+    private fun evictCellEntriesForPoint(
+        coupleId: Long,
+        albumId: Long?,
+        longitude: Double,
+        latitude: Double,
+    ) {
+        val cache = cacheManager.getCache(CacheNames.MAP_CELLS) as? CaffeineCache ?: return
+        val keys =
+            cache.nativeCache
+                .asMap()
+                .keys
+                .asSequence()
+                .filterIsInstance<String>()
+                .toList()
+        if (keys.isEmpty()) {
+            return
+        }
+
+        val targetAlbum = albumId.orZero()
+        val keysToInvalidate =
+            keys.filter { key ->
+                val parsed = MapCacheKeyFactory.parseCellKey(key) ?: return@filter false
+                if (parsed.coupleId != coupleId) return@filter false
+                if (parsed.albumId != 0L && parsed.albumId != targetAlbum) return@filter false
+                val gridSize = GridValues.getGridSize(parsed.zoom)
+                val (cellX, cellY) = MapGridIndex.toCell(longitude, latitude, gridSize)
+                parsed.cellX == cellX && parsed.cellY == cellY
+            }
+        if (keysToInvalidate.isNotEmpty()) {
+            cache.nativeCache.invalidateAll(keysToInvalidate)
+        }
+    }
+
+    private fun getCellClusters(
+        zoom: Int,
+        gridSize: Double,
+        window: CellWindow,
+        coupleId: Long?,
+        albumId: Long?,
+        canReuseCellCache: Boolean,
+    ): List<ClusterReadModel> {
+        val cache = cacheManager.getCache(CacheNames.MAP_CELLS) as? CaffeineCache
+        val version = mutationTracker.currentSequence(coupleId)
+        val clusters = mutableListOf<ClusterReadModel>()
+        val misses = mutableSetOf<Pair<Long, Long>>()
+
+        for (x in window.xMin..window.xMax) {
+            for (y in window.yMin..window.yMax) {
+                val key = MapCacheKeyFactory.buildCellKey(zoom, x, y, coupleId, albumId, version)
+                val cached = if (canReuseCellCache) cache?.get(key, CachedCell::class.java) else null
+                if (cached != null) {
+                    clusters.addAll(cached.responses)
+                } else {
+                    misses.add(x to y)
+                }
+            }
+        }
+
+        if (misses.isEmpty()) {
+            return clusters
+        }
+
+        val bounds = MapGridIndex.toMeterBounds(misses, gridSize)
+        val loadedByCell =
+            mapQueryPort
+                .findPhotosWithinBBox(
+                    west = MercatorProjection.metersToLongitude(bounds.west),
+                    south = MercatorProjection.metersToLatitude(bounds.south),
+                    east = MercatorProjection.metersToLongitude(bounds.east),
+                    north = MercatorProjection.metersToLatitude(bounds.north),
+                    coupleId = coupleId,
+                    albumId = albumId,
+                ).groupBy { photo -> MapGridIndex.toCell(photo.longitude, photo.latitude, gridSize) }
+
+        misses.forEach { (x, y) ->
+            val cellClusters =
+                loadedByCell[x to y]
+                    .orEmpty()
+                    .map { photo ->
+                        ClusterReadModel(
+                            clusterId = ClusterId.format(zoom, x, y),
+                            count = 1,
+                            thumbnailUrl = photo.url,
+                            longitude = photo.longitude,
+                            latitude = photo.latitude,
+                            takenAt = photo.takenAt,
+                        )
+                    }
+            cache?.put(MapCacheKeyFactory.buildCellKey(zoom, x, y, coupleId, albumId, version), CachedCell(cellClusters))
+            clusters.addAll(cellClusters)
+        }
+        return clusters
     }
 
     fun buildCellKey(

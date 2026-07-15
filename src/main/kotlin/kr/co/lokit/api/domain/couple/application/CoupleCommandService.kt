@@ -2,7 +2,7 @@ package kr.co.lokit.api.domain.couple.application
 
 import kr.co.lokit.api.common.annotation.OptimisticRetry
 import kr.co.lokit.api.common.exception.BusinessException
-// import kr.co.lokit.api.config.cache.evictUserCoupleCache
+import kr.co.lokit.api.config.cache.evictUserCoupleCache
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.couple.application.port.`in`.CreateCoupleUseCase
 import kr.co.lokit.api.domain.couple.domain.Couple
@@ -35,6 +35,7 @@ class CoupleCommandService(
                     userRepository.update(user.withProfileImage(lockImageUrl))
                 }
             }
+            cacheManager.evictUserCoupleCache(userId)
             created
         }
 
@@ -47,6 +48,6 @@ class CoupleCommandService(
             coupleRepository.findByUserId(userId)
                 ?: throw BusinessException.CoupleNotFoundException()
         coupleRepository.updateFirstMetDate(couple.id, firstMetDate)
-//        cacheManager.evictUserCoupleCache(*couple.userIds.toLongArray())
+        cacheManager.evictUserCoupleCache(*couple.userIds.toLongArray())
     }
 }

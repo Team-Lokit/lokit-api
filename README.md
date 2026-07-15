@@ -125,7 +125,7 @@ val (locationFuture, albumsFuture, photosFuture) =
 
 **Application Cache (Caffeine)**
 
-11개의 용도별 캐시를 Caffeine 인메모리 캐시로 관리합니다.
+10개의 용도별 캐시를 Caffeine 인메모리 캐시로 관리합니다.
 
 | Cache            | TTL | Max Size | 용도                    |
 |------------------|-----|----------|-----------------------|
@@ -133,9 +133,12 @@ val (locationFuture, albumsFuture, photosFuture) =
 | `mapPhotos`      | 10분 | 400      | Bounding Box 기반 사진 캐시 |
 | `coupleAlbums`   | 3분  | 200      | 커플 앨범 목록 캐시           |
 | `reverseGeocode` | 3분  | 100      | 역지오코딩 결과              |
-| `searchPlaces`   | 3분  | 50       | 장소 검색 결과              |
-| `presignedUrl`   | 3분  | 100      | S3 Presigned URL      |
+| `searchPlaces`   | 3분  | 30       | 장소 검색 결과              |
+| `presignedUrl`   | 3분  | 80       | S3 Presigned URL      |
 | `userCouple`     | 10분 | 200      | 사용자-커플 매핑             |
+| `albumCouple`    | 10분 | 120      | 앨범-커플 권한 매핑           |
+| `album`          | 5분  | 80       | 앨범 권한 결과               |
+| `photo`          | 5분  | 180      | 사진 권한 결과               |
 
 **Grid Cell Caching**
 
