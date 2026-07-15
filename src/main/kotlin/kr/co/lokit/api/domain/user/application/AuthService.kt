@@ -38,10 +38,13 @@ class AuthService(
                     errors = errorDetailsOf(ErrorField.USER_ID to refreshTokenRecord.userId),
                 )
 
-        return generateTokensAndSave(user)
+        return rotateToken(user, refreshToken)
     }
 
-    private fun generateTokensAndSave(user: User): AuthTokens {
+    private fun rotateToken(
+        user: User,
+        oldToken: String,
+    ): AuthTokens {
         val accessToken = jwtTokenProvider.generateAccessToken(user)
         val refreshToken = jwtTokenProvider.generateRefreshToken()
 
@@ -50,7 +53,28 @@ class AuthService(
                 jwtTokenProvider.getRefreshTokenExpirationMillis() / 1000,
             )
 
-        refreshTokenRepository.replace(
+        refreshTokenRepository.rotate(
+            oldToken = oldToken,
+            newToken = refreshToken,
+            expiresAt = expiresAt,
+        )
+
+        return AuthTokens(
+            accessToken = accessToken,
+            refreshToken = refreshToken,
+        )
+    }
+
+    fun generateTokensAndSave(user: User): AuthTokens {
+        val accessToken = jwtTokenProvider.generateAccessToken(user)
+        val refreshToken = jwtTokenProvider.generateRefreshToken()
+
+        val expiresAt =
+            LocalDateTime.now().plusSeconds(
+                jwtTokenProvider.getRefreshTokenExpirationMillis() / 1000,
+            )
+
+        refreshTokenRepository.save(
             userId = user.id,
             token = refreshToken,
             expiresAt = expiresAt,

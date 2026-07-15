@@ -150,7 +150,7 @@ class AdminController(
                 jwtTokenProvider.getRefreshTokenExpirationMillis() / 1000,
             )
 
-        refreshTokenRepository.replace(
+        refreshTokenRepository.save(
             userId = partnerUser.id,
             token = refreshToken,
             expiresAt = expiresAt,
@@ -283,7 +283,8 @@ class AdminController(
         var sequence = 1
         while (true) {
             val rawSuffix = if (sequence == 1) suffixBase else "$suffixBase$sequence"
-            val suffix = if (rawSuffix.length > MAX_ALBUM_TITLE_LENGTH) rawSuffix.takeLast(MAX_ALBUM_TITLE_LENGTH) else rawSuffix
+            val suffix =
+                if (rawSuffix.length > MAX_ALBUM_TITLE_LENGTH) rawSuffix.takeLast(MAX_ALBUM_TITLE_LENGTH) else rawSuffix
             val allowedSourceLength = (MAX_ALBUM_TITLE_LENGTH - suffix.length).coerceAtLeast(0)
             val candidate = (sourceTitle.take(allowedSourceLength) + suffix).take(MAX_ALBUM_TITLE_LENGTH)
             if (!existingTitles.contains(candidate)) {

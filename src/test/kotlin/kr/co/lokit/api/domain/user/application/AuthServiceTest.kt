@@ -81,7 +81,7 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `토큰 재발급 시 새 리프레시 토큰이 저장된다`() {
+    fun `토큰 재발급 시 새 리프레시 토큰이 회전 저장된다`() {
         val refreshTokenRecord =
             RefreshTokenRecord(
                 userId = 1L,
@@ -95,8 +95,8 @@ class AuthServiceTest {
 
         authService.refreshIfValid("valid-token")
 
-        verify(refreshTokenRepository).replace(
-            org.mockito.kotlin.eq(1L),
+        verify(refreshTokenRepository).rotate(
+            org.mockito.kotlin.eq("valid-token"),
             org.mockito.kotlin.eq("new-refresh-token"),
             org.mockito.kotlin.any(),
         )
