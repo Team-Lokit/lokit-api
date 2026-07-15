@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.Semaphore
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 @Service
 class MapPhotosCacheService(
@@ -38,6 +39,11 @@ class MapPhotosCacheService(
     private val prefetchSemaphore = Semaphore(CachePolicy.MAP_PREFETCH_CONCURRENCY)
     private val mutationTracker = MapMutationTracker(CachePolicy.MAP_MAX_MUTATIONS_PER_COUPLE)
     private val viewportTracker = MapViewportTracker()
+
+    private companion object {
+        const val MERGE_ZOOM_SCALE = 1000.0
+        const val GRID_ZOOM_STEPS = 2.0
+    }
 
     fun evictForCouple(coupleId: Long) {
         mutationTracker.evictForCouple(coupleId)
@@ -79,7 +85,7 @@ class MapPhotosCacheService(
         bbox: BBox,
         coupleId: Long?,
         albumId: Long?,
-        canReuseCellCache: Boolean = true,
+        canReuseCellCache: Boolean = false,
     ): MapPhotosReadModel = queryRawPoiClusters(zoom, bbox, coupleId, albumId, canReuseCellCache)
 
     private fun queryRawPoiClusters(
@@ -90,11 +96,22 @@ class MapPhotosCacheService(
         canReuseCellCache: Boolean,
     ): MapPhotosReadModel {
         val discreteZoom = floor(zoom).toInt()
-        val clusterGridSize = GridValues.getGridSize(discreteZoom)
+        val gridZoom = (zoom * GRID_ZOOM_STEPS).roundToInt() / GRID_ZOOM_STEPS
+        val gridZoomMilli = (gridZoom * MERGE_ZOOM_SCALE).roundToInt()
+        val clusterGridSize = GridValues.getGridSize(gridZoom)
         val prefetchGridSize = clusterGridSize
         val sequence = mutationTracker.currentSequence(coupleId)
         val requestedWindow = MapGridIndex.toCellWindow(bbox, prefetchGridSize)
-        val clusters = getCellClusters(discreteZoom, clusterGridSize, requestedWindow, coupleId, albumId, canReuseCellCache)
+        val clusters =
+            getCellClusters(
+                labelZoom = discreteZoom,
+                keyZoom = gridZoomMilli,
+                gridSize = clusterGridSize,
+                window = requestedWindow,
+                coupleId = coupleId,
+                albumId = albumId,
+                canReuseCellCache = canReuseCellCache,
+            )
 
         val prefetchCoords =
             viewportTracker.directionalPrefetchCells(
@@ -107,7 +124,8 @@ class MapPhotosCacheService(
             )
 
         scheduleRawPrefetch(
-            zoom = discreteZoom,
+            labelZoom = discreteZoom,
+            keyZoom = gridZoomMilli,
             gridSize = prefetchGridSize,
             coupleId = coupleId,
             albumId = albumId,
@@ -115,19 +133,23 @@ class MapPhotosCacheService(
             coords = prefetchCoords,
         )
 
-        val merged = clusterBoundaryMergeStrategy.mergeClusters(clusters, zoom)
+        val merged = clusterBoundaryMergeStrategy.mergeClusters(clusters, gridZoom)
         val responseSource =
             if (merged.sumOf { it.count } < clusters.size) {
                 clusters
             } else {
                 merged
             }
-        val responseClusters = responseSource.map { cluster -> cluster.copy(clusterId = ClusterId.withMergeZoom(cluster.clusterId, zoom)) }
+        val responseClusters =
+            responseSource.map { cluster ->
+                cluster.copy(clusterId = ClusterId.withMergeZoom(cluster.clusterId, gridZoom))
+            }
         return MapPhotosReadModel(clusters = Clusters.of(responseClusters))
     }
 
     private fun scheduleRawPrefetch(
-        zoom: Int,
+        labelZoom: Int,
+        keyZoom: Int,
         gridSize: Double,
         coupleId: Long?,
         albumId: Long?,
@@ -154,7 +176,8 @@ class MapPhotosCacheService(
                         yMax = coords.maxOf { it.second },
                     )
                 getCellClusters(
-                    zoom = zoom,
+                    labelZoom = labelZoom,
+                    keyZoom = keyZoom,
                     gridSize = gridSize,
                     window = prefetchWindow,
                     coupleId = coupleId,
@@ -241,7 +264,7 @@ class MapPhotosCacheService(
                 val parsed = MapCacheKeyFactory.parseCellKey(key) ?: return@filter false
                 if (parsed.coupleId != coupleId) return@filter false
                 if (parsed.albumId != 0L && parsed.albumId != targetAlbum) return@filter false
-                val gridSize = GridValues.getGridSize(parsed.zoom)
+                val gridSize = GridValues.getGridSize(parsed.zoom / MERGE_ZOOM_SCALE)
                 val (cellX, cellY) = MapGridIndex.toCell(longitude, latitude, gridSize)
                 parsed.cellX == cellX && parsed.cellY == cellY
             }
@@ -251,7 +274,8 @@ class MapPhotosCacheService(
     }
 
     private fun getCellClusters(
-        zoom: Int,
+        labelZoom: Int,
+        keyZoom: Int,
         gridSize: Double,
         window: CellWindow,
         coupleId: Long?,
@@ -265,7 +289,7 @@ class MapPhotosCacheService(
 
         for (x in window.xMin..window.xMax) {
             for (y in window.yMin..window.yMax) {
-                val key = MapCacheKeyFactory.buildCellKey(zoom, x, y, coupleId, albumId, version)
+                val key = MapCacheKeyFactory.buildCellKey(keyZoom, x, y, coupleId, albumId, version)
                 val cached = if (canReuseCellCache) cache?.get(key, CachedCell::class.java) else null
                 if (cached != null) {
                     clusters.addAll(cached.responses)
@@ -297,7 +321,7 @@ class MapPhotosCacheService(
                     .orEmpty()
                     .map { photo ->
                         ClusterReadModel(
-                            clusterId = ClusterId.format(zoom, x, y),
+                            clusterId = ClusterId.format(labelZoom, x, y),
                             count = 1,
                             thumbnailUrl = photo.url,
                             longitude = photo.longitude,
@@ -305,7 +329,10 @@ class MapPhotosCacheService(
                             takenAt = photo.takenAt,
                         )
                     }
-            cache?.put(MapCacheKeyFactory.buildCellKey(zoom, x, y, coupleId, albumId, version), CachedCell(cellClusters))
+            cache?.put(
+                MapCacheKeyFactory.buildCellKey(keyZoom, x, y, coupleId, albumId, version),
+                CachedCell(cellClusters),
+            )
             clusters.addAll(cellClusters)
         }
         return clusters

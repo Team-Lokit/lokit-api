@@ -205,9 +205,6 @@ class MapServiceTest {
         `when`(mapPhotosCacheService.getClusteredPhotos(any(), any(), eq(1L), anyOrNull(), any())).thenReturn(
             MapPhotosReadModel(clusters = Clusters.empty()),
         )
-        `when`(mapClientPort.reverseGeocode(any(), any())).thenReturn(
-            LocationInfoReadModel(address = "서울 강남구", placeName = "역삼역", regionName = "강남구"),
-        )
         `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
 
@@ -235,9 +232,6 @@ class MapServiceTest {
         `when`(mapPhotosCacheService.getClusteredPhotos(any(), any(), eq(1L), anyOrNull(), any())).thenReturn(
             MapPhotosReadModel(clusters = Clusters.empty()),
         )
-        `when`(mapClientPort.reverseGeocode(any(), any())).thenReturn(
-            LocationInfoReadModel(address = "서울 강남구", placeName = "역삼역", regionName = "강남구"),
-        )
         `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
 
@@ -261,9 +255,6 @@ class MapServiceTest {
         `when`(mapPhotosCacheService.getIndividualPhotos(any(), any(), eq(1L), anyOrNull())).thenReturn(
             MapPhotosReadModel(photos = MapPhotos.empty()),
         )
-        `when`(mapClientPort.reverseGeocode(any(), any())).thenReturn(
-            LocationInfoReadModel(address = "서울 강남구", placeName = "역삼역", regionName = "강남구"),
-        )
         `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
 
@@ -283,9 +274,6 @@ class MapServiceTest {
     fun `연결되지 않은 유저의 getMe는 빈 사진 응답을 반환한다`() {
         `when`(coupleRepository.findByUserId(1L)).thenReturn(null)
         `when`(mapPhotosCacheService.getDataVersion(any(), any(), anyOrNull(), anyOrNull())).thenReturn(0L)
-        `when`(mapClientPort.reverseGeocode(any(), any())).thenReturn(
-            LocationInfoReadModel(address = "서울 강남구", placeName = "역삼역", regionName = "강남구"),
-        )
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
 
         val result =
@@ -317,9 +305,6 @@ class MapServiceTest {
         `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), eq(albumId))).thenReturn(10L)
         `when`(mapPhotosCacheService.getClusteredPhotos(any(), any(), eq(1L), eq(albumId), any())).thenReturn(
             MapPhotosReadModel(clusters = Clusters.empty()),
-        )
-        `when`(mapClientPort.reverseGeocode(any(), any())).thenReturn(
-            LocationInfoReadModel(address = "서울 강남구", placeName = "역삼역", regionName = "강남구"),
         )
         `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)

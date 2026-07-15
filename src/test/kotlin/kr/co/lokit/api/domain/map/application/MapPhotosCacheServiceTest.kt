@@ -174,7 +174,7 @@ class MapPhotosCacheServiceTest {
     }
 
     @Test
-    fun `getClusteredPhotos uses floored zoom grid for cluster id`() {
+    fun `getClusteredPhotos uses half-step quantized zoom grid for cluster id`() {
         val bbox = BBox(126.99, 37.49, 127.01, 37.51)
         val zoom = 14.7
         val longitude = 127.0
@@ -206,13 +206,14 @@ class MapPhotosCacheServiceTest {
         val parsedClusterId = ClusterId.parseDetailed(clusterId)
 
         val discreteZoom = floor(zoom).toInt()
-        val gridSize = GridValues.getGridSize(discreteZoom)
+        val gridZoom = Math.round(zoom * 2.0).toInt() / 2.0
+        val gridSize = GridValues.getGridSize(gridZoom)
         val expectedX = floor(MercatorProjection.longitudeToMeters(longitude) / gridSize).toLong()
         val expectedY = floor(MercatorProjection.latitudeToMeters(latitude) / gridSize).toLong()
         assertEquals(discreteZoom, parsedClusterId.zoom)
         assertEquals(expectedX, parsedClusterId.cellX)
         assertEquals(expectedY, parsedClusterId.cellY)
-        assertEquals(zoom, parsedClusterId.mergeZoom)
+        assertEquals(gridZoom, parsedClusterId.mergeZoom)
     }
 
     @Test

@@ -255,7 +255,7 @@ data class HomeResponse(
 @Schema(description = "지도 ME 응답 (홈 + 사진 조회 통합)")
 data class LegacyMapMeResponse(
     @Schema(description = "위치 정보")
-    val location: LocationInfoResponse,
+    val location: LocationInfoResponse? = null,
     @Schema(description = "바운딩 박스")
     val boundingBox: BoundingBoxResponse,
     @Schema(description = "기록 수(전체 보기 사진 개수)")

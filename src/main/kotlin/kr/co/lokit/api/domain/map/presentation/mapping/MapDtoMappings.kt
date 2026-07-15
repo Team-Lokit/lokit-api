@@ -1,11 +1,30 @@
 package kr.co.lokit.api.domain.map.presentation.mapping
 
-import kr.co.lokit.api.domain.map.domain.*
-import kr.co.lokit.api.domain.map.dto.*
+import kr.co.lokit.api.domain.map.domain.AlbumMapInfoReadModel
+import kr.co.lokit.api.domain.map.domain.AlbumThumbnailsReadModel
+import kr.co.lokit.api.domain.map.domain.BoundingBoxReadModel
+import kr.co.lokit.api.domain.map.domain.ClusterPhotoReadModel
+import kr.co.lokit.api.domain.map.domain.ClusterPhotos
+import kr.co.lokit.api.domain.map.domain.ClusterReadModel
+import kr.co.lokit.api.domain.map.domain.LocationInfoReadModel
+import kr.co.lokit.api.domain.map.domain.MapMeReadModel
+import kr.co.lokit.api.domain.map.domain.MapPhotoReadModel
+import kr.co.lokit.api.domain.map.domain.PlaceReadModel
+import kr.co.lokit.api.domain.map.domain.PlaceSearchReadModel
+import kr.co.lokit.api.domain.map.dto.AlbumMapInfoResponse
+import kr.co.lokit.api.domain.map.dto.BoundingBoxResponse
+import kr.co.lokit.api.domain.map.dto.ClusterPhotoResponse
+import kr.co.lokit.api.domain.map.dto.ClusterResponse
+import kr.co.lokit.api.domain.map.dto.HomeResponse
+import kr.co.lokit.api.domain.map.dto.LegacyMapMeResponse
+import kr.co.lokit.api.domain.map.dto.LocationInfoResponse
+import kr.co.lokit.api.domain.map.dto.MapMeResponse
+import kr.co.lokit.api.domain.map.dto.MapPhotoResponse
+import kr.co.lokit.api.domain.map.dto.PlaceResponse
+import kr.co.lokit.api.domain.map.dto.PlaceSearchResponse
 
 fun MapMeReadModel.toLegacyResponse(): LegacyMapMeResponse =
     LegacyMapMeResponse(
-        location = location.toResponse(),
         boundingBox = boundingBox.toResponse(),
         totalHistoryCount = totalHistoryCount,
         albums = albums.asList().map { it.toResponse() },

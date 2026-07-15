@@ -65,7 +65,6 @@ class MapControllerTest {
 
     private fun createMapMeResponse(): MapMeReadModel =
         MapMeReadModel(
-            location = LocationInfoReadModel(address = "서울 강남구", placeName = null, regionName = "강남구"),
             boundingBox = BoundingBoxReadModel(west = 126.9, south = 37.4, east = 127.1, north = 37.6),
             totalHistoryCount = 0,
             albums = AlbumThumbnails.empty(),

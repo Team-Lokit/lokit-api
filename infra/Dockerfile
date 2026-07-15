@@ -1,4 +1,7 @@
-FROM eclipse-temurin:24-jdk-alpine AS builder
+ARG JDK_IMAGE=eclipse-temurin:24-jdk-alpine
+ARG JRE_IMAGE=eclipse-temurin:24-jre-alpine
+
+FROM ${JDK_IMAGE} AS builder
 
 WORKDIR /workspace
 
@@ -11,7 +14,7 @@ RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon bootJar -x test \
     && cp "$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)" app.jar
 
-FROM eclipse-temurin:24-jre-alpine
+FROM ${JRE_IMAGE}
 
 RUN apk add --no-cache tzdata \
     && cp /usr/share/zoneinfo/Asia/Seoul /etc/localtime \
@@ -32,6 +35,7 @@ USER spring
 EXPOSE 8080
 
 ENV JAVA_OPTS="-XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=70.0 \
     -Xss512k \
     -XX:+TieredCompilation \
     -XX:TieredStopAtLevel=1 \
