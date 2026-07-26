@@ -19,7 +19,6 @@ fun CommentWithEmoticons.toResponse(viewerUserId: Long): CommentResponse =
                 EmoticonSummaryResponse(
                     emoji = it.emoji,
                     count = it.count,
-                    reacted = it.reacted,
                     isEditable = EditabilityPolicy.canEditEmoticon(it.reacted),
                 )
             },
