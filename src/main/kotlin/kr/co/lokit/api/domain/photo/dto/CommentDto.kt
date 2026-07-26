@@ -42,8 +42,6 @@ data class EmoticonSummaryResponse(
     val emoji: String,
     @Schema(description = "이모지 개수", example = "3")
     val count: Int,
-    @Schema(description = "현재 사용자가 반응했는지 여부", example = "true")
-    val reacted: Boolean,
     @Schema(description = "조회자가 해당 이모티콘 반응을 제거할 수 있는지 여부", example = "true")
     @get:JsonProperty("isEditable")
     val isEditable: Boolean,
