@@ -12,6 +12,7 @@ import kr.co.lokit.api.domain.photo.dto.AddEmoticonRequest
 import kr.co.lokit.api.domain.photo.dto.CommentListResponse
 import kr.co.lokit.api.domain.photo.dto.CreateCommentRequest
 import kr.co.lokit.api.domain.photo.dto.RemoveEmoticonRequest
+import kr.co.lokit.api.domain.photo.dto.UpdateCommentRequest
 import kr.co.lokit.api.domain.photo.presentation.mapping.toResponse
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -51,6 +53,37 @@ class CommentController(
         CommentListResponse(
             comments = commentUseCase.getComments(photoId, userId).map { it.toResponse(userId) },
         )
+
+    @PostMapping("comments/{commentId}/replies")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@permissionService.canAccessComment(#userId, #commentId)")
+    override fun createReply(
+        @CurrentUserId userId: Long,
+        @PathVariable commentId: Long,
+        @RequestBody @Valid request: CreateCommentRequest,
+    ): IdResponse =
+        commentUseCase
+            .createReply(commentId, userId, request.content)
+            .toIdResponse(Comment::id)
+
+    @PutMapping("comments/{commentId}")
+    @PreAuthorize("@permissionService.canModifyComment(#userId, #commentId)")
+    override fun updateComment(
+        @CurrentUserId userId: Long,
+        @PathVariable commentId: Long,
+        @RequestBody @Valid request: UpdateCommentRequest,
+    ): IdResponse =
+        commentUseCase
+            .updateComment(commentId, userId, request.content)
+            .toIdResponse(Comment::id)
+
+    @DeleteMapping("comments/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@permissionService.canDeleteComment(#userId, #commentId)")
+    override fun deleteComment(
+        @CurrentUserId userId: Long,
+        @PathVariable commentId: Long,
+    ) = commentUseCase.deleteComment(commentId, userId)
 
     @PostMapping("comments/{commentId}/emoticons")
     @ResponseStatus(HttpStatus.CREATED)

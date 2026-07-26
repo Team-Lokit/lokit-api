@@ -58,7 +58,7 @@ interface AlbumJpaRepository : JpaRepository<AlbumEntity, Long> {
         """
         select a
         from Album a
-        where a.createdBy.id = :userId
+        where a.createdById = :userId
             and a.couple.id <> :currentCoupleId
             and a.isDefault = false
         """,

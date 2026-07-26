@@ -9,12 +9,12 @@ interface PhotoJpaRepository : JpaRepository<PhotoEntity, Long> {
     @Query("SELECT p.url FROM Photo p WHERE p.createdAt >= :since")
     fun findUrlsCreatedSince(since: LocalDateTime): List<String>
 
-    @Query("SELECT p FROM Photo p JOIN FETCH p.album JOIN FETCH p.uploadedBy WHERE p.id = :id")
+    @Query("SELECT p FROM Photo p JOIN FETCH p.album LEFT JOIN FETCH p.uploadedBy WHERE p.id = :id")
     fun findByIdWithRelations(id: Long): PhotoEntity?
 
     @Query(
-        "SELECT p FROM Photo p JOIN FETCH p.album JOIN FETCH p.uploadedBy" +
-            " WHERE p.uploadedBy.id = :userId ORDER BY p.takenAt DESC",
+        "SELECT p FROM Photo p JOIN FETCH p.album LEFT JOIN FETCH p.uploadedBy" +
+            " WHERE p.uploadedById = :userId ORDER BY p.takenAt DESC",
     )
     fun findAllByUploadedById(userId: Long): List<PhotoEntity>
 

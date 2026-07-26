@@ -13,6 +13,7 @@ import kr.co.lokit.api.domain.photo.dto.AddEmoticonRequest
 import kr.co.lokit.api.domain.photo.dto.CommentListResponse
 import kr.co.lokit.api.domain.photo.dto.CreateCommentRequest
 import kr.co.lokit.api.domain.photo.dto.RemoveEmoticonRequest
+import kr.co.lokit.api.domain.photo.dto.UpdateCommentRequest
 
 @SecurityRequirement(name = "Authorization")
 @Tag(name = "Comment", description = "댓글 & 이모지 API")
@@ -54,6 +55,61 @@ interface CommentApi {
         @Parameter(hidden = true) userId: Long,
         @Parameter(description = "사진 ID", example = "1", required = true) photoId: Long,
     ): CommentListResponse
+
+    @Operation(
+        summary = "답글 생성",
+        description = "댓글에 답글을 작성합니다. 답글에는 다시 답글을 작성할 수 없습니다(1-depth 제한).",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "201", description = "답글 생성 성공"),
+            ApiResponse(responseCode = "400", description = "답글 깊이 초과 (COMMENT_004) 또는 삭제된 댓글에 답글 시도 (COMMENT_006)", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "접근 권한 없음", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "댓글을 찾을 수 없음", content = [Content()]),
+        ],
+    )
+    fun createReply(
+        @Parameter(hidden = true) userId: Long,
+        @Parameter(description = "부모 댓글 ID", example = "1", required = true) commentId: Long,
+        request: CreateCommentRequest,
+    ): IdResponse
+
+    @Operation(
+        summary = "댓글 수정",
+        description = "본인이 작성한 댓글/답글을 수정합니다. 수정 이력은 남기지 않고 최신 내용만 유지됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "댓글 수정 성공"),
+            ApiResponse(responseCode = "400", description = "이미 삭제된 댓글 (COMMENT_005)", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "본인 댓글이 아님", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "댓글을 찾을 수 없음", content = [Content()]),
+        ],
+    )
+    fun updateComment(
+        @Parameter(hidden = true) userId: Long,
+        @Parameter(description = "댓글 ID", example = "1", required = true) commentId: Long,
+        request: UpdateCommentRequest,
+    ): IdResponse
+
+    @Operation(
+        summary = "댓글 삭제",
+        description = "본인이 작성한 댓글/답글을 삭제합니다. 답글이 없는 댓글/답글은 완전히 사라지고, 답글이 달린 댓글은 '삭제된 댓글입니다' 문구로 대체됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "댓글 삭제 성공"),
+            ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "본인 댓글이 아님", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "댓글을 찾을 수 없음", content = [Content()]),
+        ],
+    )
+    fun deleteComment(
+        @Parameter(hidden = true) userId: Long,
+        @Parameter(description = "댓글 ID", example = "1", required = true) commentId: Long,
+    )
 
     @Operation(
         summary = "이모지 추가",

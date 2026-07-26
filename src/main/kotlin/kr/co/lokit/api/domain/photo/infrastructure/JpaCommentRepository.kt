@@ -4,6 +4,7 @@ import kr.co.lokit.api.common.exception.entityNotFound
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.domain.Comment
 import kr.co.lokit.api.domain.photo.domain.CommentWithEmoticons
+import kr.co.lokit.api.domain.photo.domain.DeIdentifiedUserProfile
 import kr.co.lokit.api.domain.photo.domain.EmoticonSummary
 import kr.co.lokit.api.domain.photo.domain.Photo
 import kr.co.lokit.api.domain.photo.infrastructure.mapping.toDomain
@@ -27,7 +28,12 @@ class JpaCommentRepository(
         val userEntity =
             userJpaRepository.findByIdOrNull(comment.userId)
                 ?: throw entityNotFound<User>(comment.userId)
-        val entity = comment.toEntity(photoEntity, userEntity)
+        val parentEntity =
+            comment.parentId?.let { parentId ->
+                commentJpaRepository.findByIdOrNull(parentId)
+                    ?: throw entityNotFound<Comment>(parentId)
+            }
+        val entity = comment.toEntity(photoEntity, userEntity, parentEntity)
         return commentJpaRepository.save(entity).toDomain()
     }
 
@@ -48,8 +54,8 @@ class JpaCommentRepository(
         val emoticons = emoticonJpaRepository.findAllByCommentIn(comments)
         val emoticonsByComment = emoticons.groupBy { it.comment.nonNullId() }
 
-        return comments.map { comment ->
-            val commentEmoticons = emoticonsByComment[comment.nonNullId()].orEmpty()
+        fun toReadModel(entity: CommentEntity): CommentWithEmoticons {
+            val commentEmoticons = emoticonsByComment[entity.nonNullId()].orEmpty()
             val summaries =
                 commentEmoticons
                     .groupBy { it.emoji }
@@ -57,15 +63,23 @@ class JpaCommentRepository(
                         EmoticonSummary(
                             emoji = emoji,
                             count = group.size,
-                            reacted = group.any { it.user.nonNullId() == currentUserId },
+                            reacted = group.any { it.userId == currentUserId },
                         )
                     }
-            CommentWithEmoticons(
-                comment = comment.toDomain(),
-                userName = comment.user.name,
-                userProfileImageUrl = comment.user.profileImageUrl,
+            return CommentWithEmoticons(
+                comment = entity.toDomain(),
+                userName = entity.user?.name ?: DeIdentifiedUserProfile.DISPLAY_NAME,
+                userProfileImageUrl = entity.user?.profileImageUrl ?: DeIdentifiedUserProfile.hiddenProfileImageUrl(),
                 emoticons = summaries,
             )
+        }
+
+        val (topLevel, replyEntities) = comments.partition { it.parent == null }
+        val repliesByParentId = replyEntities.groupBy { it.parent!!.nonNullId() }
+
+        return topLevel.map { top ->
+            val replies = repliesByParentId[top.nonNullId()].orEmpty().map(::toReadModel)
+            toReadModel(top).copy(replies = replies)
         }
     }
 
@@ -83,5 +97,34 @@ class JpaCommentRepository(
     ): Set<Long> {
         if (photoIds.isEmpty()) return emptySet()
         return commentJpaRepository.findIdsByUserIdAndPhotoIds(userId, photoIds).toSet()
+    }
+
+    override fun countRepliesByParentId(commentId: Long): Long = commentJpaRepository.countByParentId(commentId)
+
+    override fun update(
+        id: Long,
+        content: String,
+    ): Comment {
+        val entity =
+            commentJpaRepository.findByIdOrNull(id)
+                ?: throw entityNotFound<Comment>(id)
+        entity.content = content
+        return entity.toDomain()
+    }
+
+    override fun markRemoved(
+        id: Long,
+        placeholder: String,
+    ): Comment {
+        val entity =
+            commentJpaRepository.findByIdOrNull(id)
+                ?: throw entityNotFound<Comment>(id)
+        entity.content = placeholder
+        entity.removed = true
+        return entity.toDomain()
+    }
+
+    override fun deleteHard(id: Long) {
+        commentJpaRepository.deleteById(id)
     }
 }

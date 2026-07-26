@@ -20,9 +20,23 @@ fun createComment(
     id: Long = 0L,
     photoId: Long = 1L,
     userId: Long = 1L,
+    parentId: Long? = null,
     content: String = "테스트 댓글",
     commentedAt: LocalDate = LocalDate.of(2025, 1, 1),
-) = Comment(id = id, photoId = photoId, userId = userId, content = content)
+    removed: Boolean = false,
+    createdAt: LocalDateTime = LocalDateTime.of(2025, 1, 1, 0, 0),
+    updatedAt: LocalDateTime = createdAt,
+) = Comment(
+    id = id,
+    photoId = photoId,
+    userId = userId,
+    parentId = parentId,
+    content = content,
+    commentedAt = commentedAt,
+    removed = removed,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
 
 fun createEmoticon(
     id: Long = 0L,
