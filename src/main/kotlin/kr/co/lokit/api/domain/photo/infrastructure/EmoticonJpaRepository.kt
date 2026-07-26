@@ -27,7 +27,7 @@ interface EmoticonJpaRepository : JpaRepository<EmoticonEntity, Long> {
         """
         select e.id
         from Emoticon e
-        where e.user.id = :userId
+        where e.userId = :userId
             and e.comment.photo.album.couple.id in :coupleIds
         """,
     )
@@ -40,7 +40,7 @@ interface EmoticonJpaRepository : JpaRepository<EmoticonEntity, Long> {
         """
         select e.id
         from Emoticon e
-        where e.user.id = :userId
+        where e.userId = :userId
             and e.comment.id in :commentIds
         """,
     )
@@ -53,7 +53,7 @@ interface EmoticonJpaRepository : JpaRepository<EmoticonEntity, Long> {
         """
         select e.id
         from Emoticon e
-        where e.user.id = :userId
+        where e.userId = :userId
             and e.comment.photo.id in :photoIds
         """,
     )

@@ -12,6 +12,7 @@ import kr.co.lokit.api.domain.photo.domain.CommentWithEmoticons
 import kr.co.lokit.api.domain.photo.dto.AddEmoticonRequest
 import kr.co.lokit.api.domain.photo.dto.CreateCommentRequest
 import kr.co.lokit.api.domain.photo.dto.RemoveEmoticonRequest
+import kr.co.lokit.api.domain.photo.dto.UpdateCommentRequest
 import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.fixture.createComment
 import kr.co.lokit.api.fixture.createEmoticon
@@ -31,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @WebMvcTest(CommentController::class)
@@ -112,6 +114,72 @@ class CommentControllerTest {
                 .with(authentication(userAuth())),
         )
             .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `답글 생성 성공`() {
+        val savedReply = createComment(id = 2L, parentId = 1L, content = "답글")
+        doReturn(savedReply).`when`(commentUseCase).createReply(anyLong(), anyLong(), anyObject())
+
+        mockMvc.perform(
+            post("/photos/comments/1/replies")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(CreateCommentRequest("답글"))),
+        )
+            .andExpect(status().isCreated)
+    }
+
+    @Test
+    fun `답글 생성 실패 - 내용이 비어있음`() {
+        mockMvc.perform(
+            post("/photos/comments/1/replies")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(mapOf("content" to ""))),
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `댓글 수정 성공`() {
+        val updated = createComment(id = 1L, content = "수정된 댓글")
+        doReturn(updated).`when`(commentUseCase).updateComment(anyLong(), anyLong(), anyObject())
+
+        mockMvc.perform(
+            put("/photos/comments/1")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(UpdateCommentRequest("수정된 댓글"))),
+        )
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `댓글 수정 실패 - 500자 초과`() {
+        mockMvc.perform(
+            put("/photos/comments/1")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(mapOf("content" to "a".repeat(501)))),
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `댓글 삭제 성공`() {
+        doNothing().`when`(commentUseCase).deleteComment(anyLong(), anyLong())
+
+        mockMvc.perform(
+            delete("/photos/comments/1")
+                .with(authentication(userAuth()))
+                .with(csrf()),
+        )
+            .andExpect(status().isNoContent)
     }
 
     @Test
