@@ -1,6 +1,7 @@
 package kr.co.lokit.api.domain.photo.presentation
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import kr.co.lokit.api.common.exception.ErrorCode
 import kr.co.lokit.api.common.permission.PermissionService
 import kr.co.lokit.api.config.security.CompositeAuthenticationResolver
 import kr.co.lokit.api.config.security.JwtTokenProvider
@@ -17,13 +18,18 @@ import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.fixture.createComment
 import kr.co.lokit.api.fixture.createEmoticon
 import kr.co.lokit.api.fixture.userAuth
+import org.hibernate.exception.ConstraintViolationException as HibernateConstraintViolationException
+import org.hibernate.exception.DataException
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doNothing
 import org.mockito.Mockito.doReturn
+import org.mockito.Mockito.doThrow
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.dao.CannotAcquireLockException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
@@ -33,7 +39,9 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delet
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.sql.SQLException
 
 @WebMvcTest(CommentController::class)
 class CommentControllerTest {
@@ -209,6 +217,74 @@ class CommentControllerTest {
                 .content(objectMapper.writeValueAsString(RemoveEmoticonRequest("❤️"))),
         )
             .andExpect(status().isNoContent)
+    }
+
+    @Test
+    fun `이모지 추가 중 유니크 제약 위반이 발생하면 500이 아닌 409를 반환한다`() {
+        doThrow(
+            DataIntegrityViolationException(
+                "duplicate key",
+                HibernateConstraintViolationException("duplicate key", SQLException(), "uk_emoticon"),
+            ),
+        ).`when`(emoticonUseCase).addEmoticon(anyLong(), anyLong(), anyObject())
+
+        mockMvc.perform(
+            post("/photos/comments/1/emoticons")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(AddEmoticonRequest("❤️"))),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.data.errorCode").value(ErrorCode.DATA_INTEGRITY_VIOLATION.code))
+    }
+
+    @Test
+    fun `저장 가능한 길이를 넘는 이모지는 500이 아닌 400을 반환한다`() {
+        doThrow(
+            DataIntegrityViolationException(
+                "value too long",
+                DataException("value too long", SQLException()),
+            ),
+        ).`when`(emoticonUseCase).addEmoticon(anyLong(), anyLong(), anyObject())
+
+        mockMvc.perform(
+            post("/photos/comments/1/emoticons")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(AddEmoticonRequest("👨‍👩‍👧‍👦"))),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.data.errorCode").value(ErrorCode.INVALID_INPUT.code))
+    }
+
+    @Test
+    fun `이모지 제거 중 데드락이 발생하면 500이 아닌 409를 반환한다`() {
+        doThrow(CannotAcquireLockException("deadlock detected"))
+            .`when`(emoticonUseCase).removeEmoticon(anyLong(), anyLong(), anyObject())
+
+        mockMvc.perform(
+            delete("/photos/comments/1/emoticons")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(RemoveEmoticonRequest("❤️"))),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.data.errorCode").value(ErrorCode.LOCK_TIMEOUT.code))
+    }
+
+    @Test
+    fun `Content-Type 없이 이모지를 추가하면 500이 아닌 415를 반환한다`() {
+        mockMvc.perform(
+            post("/photos/comments/1/emoticons")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .content(objectMapper.writeValueAsString(AddEmoticonRequest("❤️"))),
+        )
+            .andExpect(status().isUnsupportedMediaType)
+            .andExpect(jsonPath("$.data.errorCode").value(ErrorCode.UNSUPPORTED_MEDIA_TYPE.code))
     }
 
     @Test

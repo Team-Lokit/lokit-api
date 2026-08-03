@@ -14,6 +14,9 @@ enum class ErrorCode(
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "COMMON_004", "지원하지 않는 HTTP 메서드입니다"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_005", "서버 내부 오류가 발생했습니다"),
     NOT_INITIALIZED_VALUE_ACCESS(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_006", "초기화되지 않은 값을 접근했습니다"),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "COMMON_009", "지원하지 않는 미디어 타입입니다"),
+    NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "COMMON_010", "요청한 응답 형식을 제공할 수 없습니다"),
+    DATA_INTEGRITY_VIOLATION(HttpStatus.CONFLICT, "COMMON_011", "데이터 제약 조건을 위반했습니다. 요청 내용을 확인해주세요"),
 
     // Auth
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_001", "인증이 필요합니다"),
