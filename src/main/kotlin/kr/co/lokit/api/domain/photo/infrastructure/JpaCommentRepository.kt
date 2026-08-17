@@ -28,12 +28,7 @@ class JpaCommentRepository(
         val userEntity =
             userJpaRepository.findByIdOrNull(comment.userId)
                 ?: throw entityNotFound<User>(comment.userId)
-        val parentEntity =
-            comment.parentId?.let { parentId ->
-                commentJpaRepository.findByIdOrNull(parentId)
-                    ?: throw entityNotFound<Comment>(parentId)
-            }
-        val entity = comment.toEntity(photoEntity, userEntity, parentEntity)
+        val entity = comment.toEntity(photoEntity, userEntity)
         return commentJpaRepository.save(entity).toDomain()
     }
 
@@ -54,7 +49,7 @@ class JpaCommentRepository(
         val emoticons = emoticonJpaRepository.findAllByCommentIn(comments)
         val emoticonsByComment = emoticons.groupBy { it.comment.nonNullId() }
 
-        fun toReadModel(entity: CommentEntity): CommentWithEmoticons {
+        return comments.map { entity ->
             val commentEmoticons = emoticonsByComment[entity.nonNullId()].orEmpty()
             val summaries =
                 commentEmoticons
@@ -66,20 +61,12 @@ class JpaCommentRepository(
                             reacted = group.any { it.userId == currentUserId },
                         )
                     }
-            return CommentWithEmoticons(
+            CommentWithEmoticons(
                 comment = entity.toDomain(),
                 userName = entity.user?.name ?: DeIdentifiedUserProfile.DISPLAY_NAME,
                 userProfileImageUrl = entity.user?.profileImageUrl ?: DeIdentifiedUserProfile.hiddenProfileImageUrl(),
                 emoticons = summaries,
             )
-        }
-
-        val (topLevel, replyEntities) = comments.partition { it.parent == null }
-        val repliesByParentId = replyEntities.groupBy { it.parent!!.nonNullId() }
-
-        return topLevel.map { top ->
-            val replies = repliesByParentId[top.nonNullId()].orEmpty().map(::toReadModel)
-            toReadModel(top).copy(replies = replies)
         }
     }
 
@@ -99,8 +86,6 @@ class JpaCommentRepository(
         return commentJpaRepository.findIdsByUserIdAndPhotoIds(userId, photoIds).toSet()
     }
 
-    override fun countRepliesByParentId(commentId: Long): Long = commentJpaRepository.countByParentId(commentId)
-
     override fun update(
         id: Long,
         content: String,
@@ -109,18 +94,6 @@ class JpaCommentRepository(
             commentJpaRepository.findByIdOrNull(id)
                 ?: throw entityNotFound<Comment>(id)
         entity.content = content
-        return entity.toDomain()
-    }
-
-    override fun markRemoved(
-        id: Long,
-        placeholder: String,
-    ): Comment {
-        val entity =
-            commentJpaRepository.findByIdOrNull(id)
-                ?: throw entityNotFound<Comment>(id)
-        entity.content = placeholder
-        entity.removed = true
         return entity.toDomain()
     }
 

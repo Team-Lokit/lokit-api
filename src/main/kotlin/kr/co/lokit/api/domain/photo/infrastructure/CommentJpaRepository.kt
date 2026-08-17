@@ -7,8 +7,6 @@ interface CommentJpaRepository : JpaRepository<CommentEntity, Long> {
     @Query("SELECT c FROM Comment c LEFT JOIN FETCH c.user WHERE c.photo.id = :photoId ORDER BY c.createdAt ASC, c.id ASC")
     fun findAllByPhotoId(photoId: Long): List<CommentEntity>
 
-    fun countByParentId(parentId: Long): Long
-
     @Query(
         """
         select c.id

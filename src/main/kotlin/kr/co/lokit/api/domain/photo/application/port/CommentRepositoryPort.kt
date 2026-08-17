@@ -23,16 +23,9 @@ interface CommentRepositoryPort {
         photoIds: Set<Long>,
     ): Set<Long>
 
-    fun countRepliesByParentId(commentId: Long): Long
-
     fun update(
         id: Long,
         content: String,
-    ): Comment
-
-    fun markRemoved(
-        id: Long,
-        placeholder: String,
     ): Comment
 
     fun deleteHard(id: Long)

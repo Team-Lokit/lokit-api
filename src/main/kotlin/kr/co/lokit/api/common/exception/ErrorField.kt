@@ -10,7 +10,6 @@ object ErrorField {
     const val PHOTO_ID = "photoId"
     const val TITLE = "title"
     const val COMMENT_ID = "commentId"
-    const val PARENT_COMMENT_ID = "parentCommentId"
     const val EMOJI = "emoji"
     const val STATUS = "status"
     const val STATUS_CODE = "statusCode"

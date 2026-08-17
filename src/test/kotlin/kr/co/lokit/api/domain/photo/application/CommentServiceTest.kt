@@ -5,7 +5,6 @@ import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.EmoticonRepositoryPort
-import kr.co.lokit.api.domain.photo.domain.Comment
 import kr.co.lokit.api.domain.photo.domain.CommentWithEmoticons
 import kr.co.lokit.api.domain.photo.domain.DeIdentifiedUserProfile
 import kr.co.lokit.api.fixture.createComment
@@ -19,7 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.Mockito.`when`
-import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
@@ -92,43 +90,8 @@ class CommentServiceTest {
     }
 
     @Test
-    fun `답글을 생성할 수 있다`() {
-        val parent = createComment(id = 1L, photoId = 10L, userId = 1L)
-        val savedReply = createComment(id = 2L, photoId = 10L, userId = 2L, parentId = 1L, content = "답글")
-        `when`(commentRepository.findById(1L)).thenReturn(parent)
-        `when`(commentRepository.save(any())).thenReturn(savedReply)
-
-        val result = commentService.createReply(1L, 2L, "답글")
-
-        assertEquals(1L, result.parentId)
-        assertEquals("답글", result.content)
-    }
-
-    @Test
-    fun `답글에 답글을 작성하면 예외가 발생한다`() {
-        val reply = createComment(id = 2L, photoId = 10L, userId = 1L, parentId = 1L)
-        `when`(commentRepository.findById(2L)).thenReturn(reply)
-
-        assertThrows<BusinessException.ReplyDepthExceededException> {
-            commentService.createReply(2L, 3L, "답글의 답글")
-        }
-    }
-
-    @Test
-    fun `삭제된 댓글에는 답글을 작성할 수 없다`() {
-        val removedComment = createComment(id = 1L, photoId = 10L, userId = 1L, removed = true)
-        `when`(commentRepository.findById(1L)).thenReturn(removedComment)
-
-        assertThrows<BusinessException.ReplyToRemovedNotAllowedException> {
-            commentService.createReply(1L, 2L, "답글")
-        }
-    }
-
-    @Test
     fun `댓글을 수정할 수 있다`() {
-        val existing = createComment(id = 1L, photoId = 10L, userId = 1L)
         val updated = createComment(id = 1L, photoId = 10L, userId = 1L, content = "수정된 댓글")
-        `when`(commentRepository.findById(1L)).thenReturn(existing)
         `when`(commentRepository.update(1L, "수정된 댓글")).thenReturn(updated)
 
         val result = commentService.updateComment(1L, 1L, "수정된 댓글")
@@ -137,90 +100,10 @@ class CommentServiceTest {
     }
 
     @Test
-    fun `이미 삭제된 댓글은 수정할 수 없다`() {
-        val removedComment = createComment(id = 1L, photoId = 10L, userId = 1L, removed = true)
-        `when`(commentRepository.findById(1L)).thenReturn(removedComment)
-
-        assertThrows<BusinessException.CommentAlreadyRemovedException> {
-            commentService.updateComment(1L, 1L, "수정 시도")
-        }
-    }
-
-    @Test
-    fun `답글이 없는 최상위 댓글을 삭제하면 완전히 사라진다`() {
-        val existing = createComment(id = 1L, photoId = 10L, userId = 1L)
-        `when`(commentRepository.findById(1L)).thenReturn(existing)
-        `when`(commentRepository.countRepliesByParentId(1L)).thenReturn(0L)
-
+    fun `댓글을 삭제하면 완전히 사라진다`() {
         commentService.deleteComment(1L, 1L)
 
         verify(commentRepository).deleteHard(1L)
-        verify(commentRepository, never()).markRemoved(any(), any())
-    }
-
-    @Test
-    fun `답글이 있는 최상위 댓글을 삭제하면 플레이스홀더로 치환된다`() {
-        val existing = createComment(id = 1L, photoId = 10L, userId = 1L)
-        `when`(commentRepository.findById(1L)).thenReturn(existing)
-        `when`(commentRepository.countRepliesByParentId(1L)).thenReturn(2L)
-
-        commentService.deleteComment(1L, 1L)
-
-        verify(commentRepository).markRemoved(1L, Comment.REMOVED_PLACEHOLDER_TEXT)
-        verify(commentRepository, never()).deleteHard(any())
-    }
-
-    @Test
-    fun `답글을 삭제하면 완전히 사라진다`() {
-        val reply = createComment(id = 2L, photoId = 10L, userId = 1L, parentId = 1L)
-        `when`(commentRepository.findById(2L)).thenReturn(reply)
-
-        commentService.deleteComment(2L, 1L)
-
-        verify(commentRepository).deleteHard(2L)
-        verify(commentRepository, never()).countRepliesByParentId(any())
-    }
-
-    @Test
-    fun `중첩된 답글도 작성자에 따라 독립적으로 비식별 처리된다`() {
-        val disconnectedByUserId = 2L
-        val viewerUserId = 1L
-        val photoId = 10L
-
-        val comments =
-            listOf(
-                CommentWithEmoticons(
-                    comment = createComment(id = 1L, userId = viewerUserId, photoId = photoId),
-                    userName = "나",
-                    userProfileImageUrl = "https://example.com/my-profile.jpg",
-                    emoticons = emptyList(),
-                    replies =
-                        listOf(
-                            CommentWithEmoticons(
-                                comment = createComment(id = 2L, userId = disconnectedByUserId, photoId = photoId, parentId = 1L),
-                                userName = "탈퇴한유저",
-                                userProfileImageUrl = "https://example.com/profile.jpg",
-                                emoticons = emptyList(),
-                            ),
-                        ),
-                ),
-            )
-
-        `when`(commentRepository.findAllByPhotoIdWithEmoticons(photoId, viewerUserId)).thenReturn(comments)
-        `when`(coupleRepository.findByUserId(viewerUserId)).thenReturn(
-            createCouple(
-                id = 1L,
-                userIds = listOf(viewerUserId, disconnectedByUserId),
-                status = CoupleStatus.DISCONNECTED,
-                disconnectedByUserId = disconnectedByUserId,
-            ),
-        )
-
-        val result = commentService.getComments(photoId, viewerUserId)
-
-        assertEquals("나", result[0].userName)
-        assertEquals(DeIdentifiedUserProfile.DISPLAY_NAME, result[0].replies[0].userName)
-        assertNull(result[0].replies[0].userProfileImageUrl)
     }
 
     @Test

@@ -20,4 +20,3 @@ CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS unique_user_email_is_deleted ON u
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_couple_user_one_active_per_user ON couple_user (user_id) WHERE is_deleted = false;
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_invite_code_code_active ON invite_code (code) WHERE is_deleted = false;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_invite_code_creator_status_expires ON invite_code (created_by, status, expires_at) WHERE is_deleted = false;
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_comment_parent_id_active ON comment (parent_id) WHERE is_deleted = false;

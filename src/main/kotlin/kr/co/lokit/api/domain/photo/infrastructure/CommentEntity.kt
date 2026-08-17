@@ -17,7 +17,6 @@ import java.time.LocalDate
     indexes = [
         Index(columnList = "photo_id"),
         Index(columnList = "user_id"),
-        Index(columnList = "parent_id"),
     ],
 )
 class CommentEntity(
@@ -28,14 +27,8 @@ class CommentEntity(
     @JoinColumn(name = "user_id", nullable = false)
     @NotFound(action = NotFoundAction.IGNORE)
     val user: UserEntity?,
-    @ManyToOne
-    @JoinColumn(name = "parent_id")
-    @NotFound(action = NotFoundAction.IGNORE)
-    val parent: CommentEntity? = null,
     @Column(nullable = false, length = 500)
     var content: String,
     @Column(nullable = false)
     var commentedAt: LocalDate,
-    @Column(nullable = false)
-    var removed: Boolean = false,
 ) : BaseEntity()
