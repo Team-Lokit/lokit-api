@@ -1,18 +1,4 @@
-ARG JDK_IMAGE=eclipse-temurin:24-jdk-alpine
 ARG JRE_IMAGE=eclipse-temurin:24-jre-alpine
-
-FROM ${JDK_IMAGE} AS builder
-
-WORKDIR /workspace
-
-COPY gradlew ./
-COPY gradle gradle
-COPY build.gradle.kts settings.gradle.kts ./
-COPY src src
-
-RUN chmod +x ./gradlew \
-    && ./gradlew --no-daemon bootJar -x test \
-    && cp "$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)" app.jar
 
 FROM ${JRE_IMAGE}
 
@@ -28,7 +14,7 @@ WORKDIR /app
 RUN mkdir -p /app/logs \
     && chown -R spring:spring /app
 
-COPY --from=builder --chown=spring:spring /workspace/app.jar app.jar
+COPY --chown=spring:spring app.jar app.jar
 
 USER spring
 
