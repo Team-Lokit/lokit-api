@@ -11,8 +11,6 @@ RUN addgroup -S spring && adduser -S spring -G spring
 
 WORKDIR /app
 
-COPY --chown=spring:spring ./newrelic/newrelic.jar /usr/local/newrelic/newrelic.jar
-COPY --chown=spring:spring ./newrelic/newrelic.yml /usr/local/newrelic/newrelic.yml
 RUN mkdir -p /usr/local/newrelic/logs \
     && chown -R spring:spring /usr/local/newrelic
 
