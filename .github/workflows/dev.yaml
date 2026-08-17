@@ -35,10 +35,19 @@ jobs:
                 with:
                     java-version: '24'
                     distribution: 'temurin'
-                    cache: gradle
 
-            -   name: Test & Coverage
-                run: ./gradlew test jacocoTestReport jacocoTestCoverageVerification --configuration-cache --parallel --build-cache -Dorg.gradle.configuration-cache.read-only=true -PtestMaxParallelForks=2 -PcoverageVerification=true
+            -   name: Test & Build jar
+                run: ./gradlew test jacocoTestReport jacocoTestCoverageVerification bootJar --configuration-cache --parallel --build-cache -Dorg.gradle.configuration-cache.read-only=true -PtestMaxParallelForks=4 -PcoverageVerification=true
+
+            -   name: Package jar for artifact
+                run: cp "$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)" app.jar
+
+            -   name: Upload application jar
+                uses: actions/upload-artifact@v4
+                with:
+                    name: app-jar
+                    path: app.jar
+                    retention-days: 1
 
             -   name: Upload JaCoCo report
                 if: always()
@@ -230,6 +239,12 @@ jobs:
         steps:
             -   name: Checkout
                 uses: actions/checkout@v4
+
+            -   name: Download application jar
+                uses: actions/download-artifact@v4
+                with:
+                    name: app-jar
+                    path: .
 
             -   name: Set up Docker Buildx
                 uses: docker/setup-buildx-action@v3
