@@ -7,6 +7,7 @@ import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.UserRepositoryPort
 import kr.co.lokit.api.fixture.createAlbum
+import kr.co.lokit.api.fixture.createComment
 import kr.co.lokit.api.fixture.createCouple
 import kr.co.lokit.api.fixture.createPhoto
 import kr.co.lokit.api.fixture.createUser
@@ -216,5 +217,53 @@ class PermissionServiceTest {
         `when`(userRepository.findById(1L)).thenReturn(adminUser)
 
         assert(permissionService.canReadPhoto(1L, 999L))
+    }
+
+    @Test
+    fun `작성자는 댓글을 수정할 수 있다`() {
+        val user = createUser(id = 1L, role = UserRole.USER)
+        val comment = createComment(id = 1L, userId = 1L)
+        `when`(userRepository.findById(1L)).thenReturn(user)
+        `when`(commentRepository.findById(1L)).thenReturn(comment)
+
+        assert(permissionService.canModifyComment(1L, 1L))
+    }
+
+    @Test
+    fun `작성자가 아니면 댓글을 수정할 수 없다`() {
+        val user = createUser(id = 2L, role = UserRole.USER)
+        val comment = createComment(id = 1L, userId = 1L)
+        `when`(userRepository.findById(2L)).thenReturn(user)
+        `when`(commentRepository.findById(1L)).thenReturn(comment)
+
+        assert(!permissionService.canModifyComment(2L, 1L))
+    }
+
+    @Test
+    fun `Admin은 타인의 댓글도 수정할 수 있다`() {
+        val adminUser = createUser(id = 1L, role = UserRole.ADMIN)
+        `when`(userRepository.findById(1L)).thenReturn(adminUser)
+
+        assert(permissionService.canModifyComment(1L, 999L))
+    }
+
+    @Test
+    fun `작성자는 댓글을 삭제할 수 있다`() {
+        val user = createUser(id = 1L, role = UserRole.USER)
+        val comment = createComment(id = 1L, userId = 1L)
+        `when`(userRepository.findById(1L)).thenReturn(user)
+        `when`(commentRepository.findById(1L)).thenReturn(comment)
+
+        assert(permissionService.canDeleteComment(1L, 1L))
+    }
+
+    @Test
+    fun `작성자가 아니면 댓글을 삭제할 수 없다`() {
+        val user = createUser(id = 2L, role = UserRole.USER)
+        val comment = createComment(id = 1L, userId = 1L)
+        `when`(userRepository.findById(2L)).thenReturn(user)
+        `when`(commentRepository.findById(1L)).thenReturn(comment)
+
+        assert(!permissionService.canDeleteComment(2L, 1L))
     }
 }

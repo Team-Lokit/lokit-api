@@ -14,4 +14,15 @@ interface CommentUseCase {
         photoId: Long,
         currentUserId: Long,
     ): List<CommentWithEmoticons>
+
+    fun updateComment(
+        commentId: Long,
+        userId: Long,
+        content: String,
+    ): Comment
+
+    fun deleteComment(
+        commentId: Long,
+        userId: Long,
+    )
 }

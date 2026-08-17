@@ -13,6 +13,7 @@ import kr.co.lokit.api.domain.photo.dto.AddEmoticonRequest
 import kr.co.lokit.api.domain.photo.dto.CommentListResponse
 import kr.co.lokit.api.domain.photo.dto.CreateCommentRequest
 import kr.co.lokit.api.domain.photo.dto.RemoveEmoticonRequest
+import kr.co.lokit.api.domain.photo.dto.UpdateCommentRequest
 
 @SecurityRequirement(name = "Authorization")
 @Tag(name = "Comment", description = "댓글 & 이모지 API")
@@ -56,17 +57,61 @@ interface CommentApi {
     ): CommentListResponse
 
     @Operation(
+        summary = "댓글 수정",
+        description = "본인이 작성한 댓글을 수정합니다. 수정 이력은 남기지 않고 최신 내용만 유지됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "댓글 수정 성공"),
+            ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "본인 댓글이 아님", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "댓글을 찾을 수 없음", content = [Content()]),
+        ],
+    )
+    fun updateComment(
+        @Parameter(hidden = true) userId: Long,
+        @Parameter(description = "댓글 ID", example = "1", required = true) commentId: Long,
+        request: UpdateCommentRequest,
+    ): IdResponse
+
+    @Operation(
+        summary = "댓글 삭제",
+        description = "본인이 작성한 댓글을 삭제합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "댓글 삭제 성공"),
+            ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "본인 댓글이 아님", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "댓글을 찾을 수 없음", content = [Content()]),
+        ],
+    )
+    fun deleteComment(
+        @Parameter(hidden = true) userId: Long,
+        @Parameter(description = "댓글 ID", example = "1", required = true) commentId: Long,
+    )
+
+    @Operation(
         summary = "이모지 추가",
         description = "댓글에 이모지를 추가합니다. 사용자당 댓글당 최대 10개의 서로 다른 이모지를 추가할 수 있습니다.",
     )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "201", description = "이모지 추가 성공"),
-            ApiResponse(responseCode = "400", description = "이모지 최대 개수 초과 (COMMENT_001)", content = [Content()]),
+            ApiResponse(
+                responseCode = "400",
+                description = "이모지 최대 개수 초과 (COMMENT_001) 또는 저장 가능한 길이를 넘는 이모지 (COMMON_001)",
+                content = [Content()],
+            ),
             ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
             ApiResponse(responseCode = "403", description = "접근 권한 없음", content = [Content()]),
             ApiResponse(responseCode = "404", description = "댓글을 찾을 수 없음", content = [Content()]),
-            ApiResponse(responseCode = "409", description = "이미 추가된 이모지", content = [Content()]),
+            ApiResponse(
+                responseCode = "409",
+                description = "이미 추가된 이모지 (COMMENT_003), 동시 추가 경합으로 인한 제약 위반 (COMMON_011)",
+                content = [Content()],
+            ),
+            ApiResponse(responseCode = "415", description = "Content-Type 누락/불일치 (COMMON_009)", content = [Content()]),
         ],
     )
     fun addEmoticon(
@@ -84,7 +129,9 @@ interface CommentApi {
             ApiResponse(responseCode = "204", description = "이모지 제거 성공"),
             ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
             ApiResponse(responseCode = "403", description = "접근 권한 없음", content = [Content()]),
-            ApiResponse(responseCode = "404", description = "이모지를 찾을 수 없음 (COMMENT_002)", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "이모지를 찾을 수 없음 (RESOURCE_001)", content = [Content()]),
+            ApiResponse(responseCode = "409", description = "동시 제거 경합 (COMMON_007, COMMON_008)", content = [Content()]),
+            ApiResponse(responseCode = "415", description = "Content-Type 누락/불일치 (COMMON_009)", content = [Content()]),
         ],
     )
     fun removeEmoticon(

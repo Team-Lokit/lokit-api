@@ -38,12 +38,23 @@ class CommentService(
     ): List<CommentWithEmoticons> {
         val comments = commentRepository.findAllByPhotoIdWithEmoticons(photoId, currentUserId)
         val deIdentifyUserId = coupleRepository.findByUserId(currentUserId)?.deIdentifiedUserId()
-        return deIdentifyUserId
-            ?.let { targetUserId ->
-                comments.map { comment ->
-                    if (comment.comment.userId == targetUserId) comment.deIdentified() else comment
-                }
-            } ?: comments
+            ?: return comments
+        return comments.map { if (it.comment.userId == deIdentifyUserId) it.deIdentified() else it }
+    }
+
+    @Transactional
+    override fun updateComment(
+        commentId: Long,
+        userId: Long,
+        content: String,
+    ): Comment = commentRepository.update(commentId, content)
+
+    @Transactional
+    override fun deleteComment(
+        commentId: Long,
+        userId: Long,
+    ) {
+        commentRepository.deleteHard(commentId)
     }
 
     @Transactional

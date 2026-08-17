@@ -9,6 +9,8 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import kr.co.lokit.api.common.entity.BaseEntity
 import kr.co.lokit.api.domain.user.infrastructure.UserEntity
+import org.hibernate.annotations.NotFound
+import org.hibernate.annotations.NotFoundAction
 
 @Entity(name = "Emoticon")
 @Table(
@@ -21,7 +23,10 @@ class EmoticonEntity(
     val comment: CommentEntity,
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
-    val user: UserEntity,
+    @NotFound(action = NotFoundAction.IGNORE)
+    val user: UserEntity?,
+    @Column(name = "user_id", insertable = false, updatable = false)
+    val userId: Long = user?.id ?: 0L,
     @Column(nullable = false, length = 4)
     val emoji: String,
 ) : BaseEntity()

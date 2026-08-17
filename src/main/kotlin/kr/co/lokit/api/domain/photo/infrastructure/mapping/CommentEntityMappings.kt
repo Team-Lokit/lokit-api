@@ -22,9 +22,11 @@ fun CommentEntity.toDomain(): Comment =
     Comment(
         id = nonNullId(),
         photoId = photo.nonNullId(),
-        userId = user.nonNullId(),
+        userId = user?.id ?: 0L,
         content = content,
         commentedAt = commentedAt,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
     )
 
 fun Emoticon.toEntity(
@@ -34,6 +36,7 @@ fun Emoticon.toEntity(
     EmoticonEntity(
         comment = comment,
         user = user,
+        userId = user.nonNullId(),
         emoji = emoji,
     )
 
@@ -41,6 +44,6 @@ fun EmoticonEntity.toDomain(): Emoticon =
     Emoticon(
         id = nonNullId(),
         commentId = comment.nonNullId(),
-        userId = user.nonNullId(),
+        userId = userId,
         emoji = emoji,
     )

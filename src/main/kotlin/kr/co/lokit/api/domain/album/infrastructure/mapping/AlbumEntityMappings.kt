@@ -11,7 +11,7 @@ fun AlbumEntity.toDomain(): Album =
         id = nonNullId(),
         title = title,
         coupleId = couple.nonNullId(),
-        createdById = createdBy.nonNullId(),
+        createdById = createdById,
         photoCount = photoCount,
         isDefault = isDefault,
     ).apply {

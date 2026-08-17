@@ -10,6 +10,8 @@ import kr.co.lokit.api.common.entity.BaseEntity
 import kr.co.lokit.api.domain.album.infrastructure.AlbumEntity
 import kr.co.lokit.api.domain.photo.domain.Photo
 import kr.co.lokit.api.domain.user.infrastructure.UserEntity
+import org.hibernate.annotations.NotFound
+import org.hibernate.annotations.NotFoundAction
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.Point
@@ -37,7 +39,10 @@ class PhotoEntity(
     var address: String,
     @ManyToOne
     @JoinColumn(name = "uploaded_by", nullable = false)
-    var uploadedBy: UserEntity,
+    @NotFound(action = NotFoundAction.IGNORE)
+    var uploadedBy: UserEntity?,
+    @Column(name = "uploaded_by", insertable = false, updatable = false)
+    var uploadedById: Long = uploadedBy?.id ?: 0L,
 ) : BaseEntity() {
     val longitude: Double
         get() = location.x
@@ -69,6 +74,7 @@ class PhotoEntity(
     ) {
         this.album = album
         this.uploadedBy = uploadedBy
+        this.uploadedById = uploadedBy.nonNullId()
         this.url = photo.url
         this.description = photo.description
         this.coupleId = album.couple.nonNullId()

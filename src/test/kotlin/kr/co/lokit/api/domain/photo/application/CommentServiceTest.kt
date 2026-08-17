@@ -90,6 +90,23 @@ class CommentServiceTest {
     }
 
     @Test
+    fun `댓글을 수정할 수 있다`() {
+        val updated = createComment(id = 1L, photoId = 10L, userId = 1L, content = "수정된 댓글")
+        `when`(commentRepository.update(1L, "수정된 댓글")).thenReturn(updated)
+
+        val result = commentService.updateComment(1L, 1L, "수정된 댓글")
+
+        assertEquals("수정된 댓글", result.content)
+    }
+
+    @Test
+    fun `댓글을 삭제하면 완전히 사라진다`() {
+        commentService.deleteComment(1L, 1L)
+
+        verify(commentRepository).deleteHard(1L)
+    }
+
+    @Test
     fun `커플 연결 해제 시 끊은 사용자의 댓글이 비식별 처리된다`() {
         val disconnectedByUserId = 2L
         val viewerUserId = 1L

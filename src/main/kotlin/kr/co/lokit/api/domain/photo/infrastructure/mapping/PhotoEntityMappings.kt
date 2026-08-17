@@ -1,6 +1,7 @@
 package kr.co.lokit.api.domain.photo.infrastructure.mapping
 
 import kr.co.lokit.api.domain.album.infrastructure.AlbumEntity
+import kr.co.lokit.api.domain.photo.domain.DeIdentifiedUserProfile
 import kr.co.lokit.api.domain.photo.domain.Location
 import kr.co.lokit.api.domain.photo.domain.Photo
 import kr.co.lokit.api.domain.photo.domain.PhotoDetail
@@ -31,7 +32,7 @@ fun PhotoEntity.toDomain(): Photo =
         location = Location(longitude = longitude, latitude = latitude),
         description = description,
         url = url,
-        uploadedById = uploadedBy.nonNullId(),
+        uploadedById = uploadedById,
         takenAt = takenAt,
         address = address,
     )
@@ -42,9 +43,9 @@ fun PhotoEntity.toPhotoDetail(): PhotoDetail =
         url = url,
         takenAt = takenAt,
         albumName = album.title,
-        uploadedById = uploadedBy.nonNullId(),
-        uploaderName = uploadedBy.name,
-        uploaderProfileImageUrl = uploadedBy.profileImageUrl,
+        uploadedById = uploadedById,
+        uploaderName = uploadedBy?.name ?: DeIdentifiedUserProfile.DISPLAY_NAME,
+        uploaderProfileImageUrl = uploadedBy?.profileImageUrl ?: DeIdentifiedUserProfile.hiddenProfileImageUrl(),
         location =
             Location(
                 longitude = longitude,

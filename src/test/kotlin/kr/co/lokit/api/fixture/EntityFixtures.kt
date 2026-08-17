@@ -122,10 +122,16 @@ fun createRefreshTokenEntity(
 fun createCommentEntity(
     id: Long? = null,
     photo: PhotoEntity = createPhotoEntity(),
-    user: UserEntity = createUserEntity(),
+    user: UserEntity? = createUserEntity(),
     content: String = "테스트 댓글",
 ): CommentEntity {
-    val entity = CommentEntity(photo = photo, user = user, content = content, commentedAt = LocalDate.now())
+    val entity =
+        CommentEntity(
+            photo = photo,
+            user = user,
+            content = content,
+            commentedAt = LocalDate.now(),
+        )
     id?.let { setEntityId(entity, it) }
     return entity
 }

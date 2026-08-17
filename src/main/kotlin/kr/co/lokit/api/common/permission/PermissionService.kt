@@ -112,6 +112,21 @@ class PermissionService(
         return isCoupleMember(userId, album.coupleId)
     }
 
+    fun canModifyComment(
+        userId: Long,
+        commentId: Long,
+    ): Boolean {
+        if (isAdmin(userId)) return true
+
+        val comment = commentRepository.findById(commentId)
+        return comment.userId == userId
+    }
+
+    fun canDeleteComment(
+        userId: Long,
+        commentId: Long,
+    ): Boolean = canModifyComment(userId, commentId)
+
     private fun getUserRole(userId: Long): UserRole =
         userRepository.findById(userId)?.role
             ?: throw entityNotFound<User>(userId)

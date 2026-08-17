@@ -4,6 +4,7 @@ import kr.co.lokit.api.common.exception.entityNotFound
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.domain.Comment
 import kr.co.lokit.api.domain.photo.domain.CommentWithEmoticons
+import kr.co.lokit.api.domain.photo.domain.DeIdentifiedUserProfile
 import kr.co.lokit.api.domain.photo.domain.EmoticonSummary
 import kr.co.lokit.api.domain.photo.domain.Photo
 import kr.co.lokit.api.domain.photo.infrastructure.mapping.toDomain
@@ -48,8 +49,8 @@ class JpaCommentRepository(
         val emoticons = emoticonJpaRepository.findAllByCommentIn(comments)
         val emoticonsByComment = emoticons.groupBy { it.comment.nonNullId() }
 
-        return comments.map { comment ->
-            val commentEmoticons = emoticonsByComment[comment.nonNullId()].orEmpty()
+        return comments.map { entity ->
+            val commentEmoticons = emoticonsByComment[entity.nonNullId()].orEmpty()
             val summaries =
                 commentEmoticons
                     .groupBy { it.emoji }
@@ -57,13 +58,13 @@ class JpaCommentRepository(
                         EmoticonSummary(
                             emoji = emoji,
                             count = group.size,
-                            reacted = group.any { it.user.nonNullId() == currentUserId },
+                            reacted = group.any { it.userId == currentUserId },
                         )
                     }
             CommentWithEmoticons(
-                comment = comment.toDomain(),
-                userName = comment.user.name,
-                userProfileImageUrl = comment.user.profileImageUrl,
+                comment = entity.toDomain(),
+                userName = entity.user?.name ?: DeIdentifiedUserProfile.DISPLAY_NAME,
+                userProfileImageUrl = entity.user?.profileImageUrl ?: DeIdentifiedUserProfile.hiddenProfileImageUrl(),
                 emoticons = summaries,
             )
         }
@@ -83,5 +84,20 @@ class JpaCommentRepository(
     ): Set<Long> {
         if (photoIds.isEmpty()) return emptySet()
         return commentJpaRepository.findIdsByUserIdAndPhotoIds(userId, photoIds).toSet()
+    }
+
+    override fun update(
+        id: Long,
+        content: String,
+    ): Comment {
+        val entity =
+            commentJpaRepository.findByIdOrNull(id)
+                ?: throw entityNotFound<Comment>(id)
+        entity.content = content
+        return entity.toDomain()
+    }
+
+    override fun deleteHard(id: Long) {
+        commentJpaRepository.deleteById(id)
     }
 }

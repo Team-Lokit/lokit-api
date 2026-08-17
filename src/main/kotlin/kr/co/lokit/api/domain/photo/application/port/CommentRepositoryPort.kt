@@ -22,4 +22,11 @@ interface CommentRepositoryPort {
         userId: Long,
         photoIds: Set<Long>,
     ): Set<Long>
+
+    fun update(
+        id: Long,
+        content: String,
+    ): Comment
+
+    fun deleteHard(id: Long)
 }

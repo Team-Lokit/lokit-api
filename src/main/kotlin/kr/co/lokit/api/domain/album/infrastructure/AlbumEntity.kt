@@ -14,6 +14,8 @@ import kr.co.lokit.api.domain.album.domain.Album
 import kr.co.lokit.api.domain.couple.infrastructure.CoupleEntity
 import kr.co.lokit.api.domain.photo.infrastructure.PhotoEntity
 import kr.co.lokit.api.domain.user.infrastructure.UserEntity
+import org.hibernate.annotations.NotFound
+import org.hibernate.annotations.NotFoundAction
 import java.time.LocalDateTime
 
 @Entity(name = "Album")
@@ -31,7 +33,10 @@ class AlbumEntity(
     val couple: CoupleEntity,
     @ManyToOne
     @JoinColumn(name = "created_by", nullable = false)
-    val createdBy: UserEntity,
+    @NotFound(action = NotFoundAction.IGNORE)
+    val createdBy: UserEntity?,
+    @Column(name = "created_by", insertable = false, updatable = false)
+    val createdById: Long = createdBy?.id ?: 0L,
     @Column(nullable = false, columnDefinition = "boolean not null default false")
     val isDefault: Boolean = false,
 ) : BaseEntity() {
