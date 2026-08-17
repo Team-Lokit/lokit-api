@@ -123,18 +123,14 @@ fun createCommentEntity(
     id: Long? = null,
     photo: PhotoEntity = createPhotoEntity(),
     user: UserEntity? = createUserEntity(),
-    parent: CommentEntity? = null,
     content: String = "테스트 댓글",
-    removed: Boolean = false,
 ): CommentEntity {
     val entity =
         CommentEntity(
             photo = photo,
             user = user,
-            parent = parent,
             content = content,
             commentedAt = LocalDate.now(),
-            removed = removed,
         )
     id?.let { setEntityId(entity, it) }
     return entity

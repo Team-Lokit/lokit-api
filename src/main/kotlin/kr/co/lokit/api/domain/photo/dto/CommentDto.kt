@@ -57,7 +57,7 @@ data class CommentResponse(
     val userName: String,
     @Schema(description = "작성자 프로필 이미지 URL")
     val userProfileImageUrl: String?,
-    @Schema(description = "댓글 내용 (삭제된 댓글은 고정 문구로 대체됨)", example = "멋진 사진이네요!")
+    @Schema(description = "댓글 내용", example = "멋진 사진이네요!")
     val content: String,
     @Schema(description = "작성일")
     val commentedAt: LocalDate,
@@ -69,8 +69,6 @@ data class CommentResponse(
     @Schema(description = "수정 여부", example = "false")
     @get:JsonProperty("isEdited")
     val isEdited: Boolean,
-    @Schema(description = "답글 목록 (1-depth, 답글에는 답글이 없음)")
-    val replies: List<CommentResponse>,
 )
 
 @Schema(description = "댓글 목록 응답")

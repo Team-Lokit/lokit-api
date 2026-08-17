@@ -10,15 +10,12 @@ import kr.co.lokit.api.domain.user.infrastructure.UserEntity
 fun Comment.toEntity(
     photo: PhotoEntity,
     user: UserEntity,
-    parent: CommentEntity? = null,
 ): CommentEntity =
     CommentEntity(
         photo = photo,
         user = user,
-        parent = parent,
         content = content,
         commentedAt = commentedAt,
-        removed = removed,
     )
 
 fun CommentEntity.toDomain(): Comment =
@@ -26,10 +23,8 @@ fun CommentEntity.toDomain(): Comment =
         id = nonNullId(),
         photoId = photo.nonNullId(),
         userId = user?.id ?: 0L,
-        parentId = parent?.nonNullId(),
         content = content,
         commentedAt = commentedAt,
-        removed = removed,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

@@ -62,9 +62,6 @@ enum class ErrorCode(
     COMMENT_MAX_EMOTICONS_EXCEEDED(HttpStatus.BAD_REQUEST, "COMMENT_001", "댓글당 최대 10개의 이모지만 추가할 수 있습니다"),
     EMOTICON_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_002", "이모지를 찾을 수 없습니다"),
     EMOTICON_ALREADY_EXISTS(HttpStatus.CONFLICT, "COMMENT_003", "이미 동일한 이모지를 추가했습니다"),
-    REPLY_DEPTH_EXCEEDED(HttpStatus.BAD_REQUEST, "COMMENT_004", "답글에는 답글을 작성할 수 없습니다"),
-    COMMENT_ALREADY_REMOVED(HttpStatus.BAD_REQUEST, "COMMENT_005", "이미 삭제된 댓글은 수정할 수 없습니다"),
-    REPLY_TO_REMOVED_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "COMMENT_006", "삭제된 댓글에는 답글을 작성할 수 없습니다"),
 
     // Couple
     COUPLE_MAX_MEMBERS_EXCEEDED(HttpStatus.BAD_REQUEST, "COUPLE_001", "커플 최대 인원을 초과했습니다"),

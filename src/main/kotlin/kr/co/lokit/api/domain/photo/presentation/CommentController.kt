@@ -54,18 +54,6 @@ class CommentController(
             comments = commentUseCase.getComments(photoId, userId).map { it.toResponse(userId) },
         )
 
-    @PostMapping("comments/{commentId}/replies")
-    @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("@permissionService.canAccessComment(#userId, #commentId)")
-    override fun createReply(
-        @CurrentUserId userId: Long,
-        @PathVariable commentId: Long,
-        @RequestBody @Valid request: CreateCommentRequest,
-    ): IdResponse =
-        commentUseCase
-            .createReply(commentId, userId, request.content)
-            .toIdResponse(Comment::id)
-
     @PutMapping("comments/{commentId}")
     @PreAuthorize("@permissionService.canModifyComment(#userId, #commentId)")
     override fun updateComment(

@@ -15,12 +15,6 @@ interface CommentUseCase {
         currentUserId: Long,
     ): List<CommentWithEmoticons>
 
-    fun createReply(
-        parentCommentId: Long,
-        userId: Long,
-        content: String,
-    ): Comment
-
     fun updateComment(
         commentId: Long,
         userId: Long,

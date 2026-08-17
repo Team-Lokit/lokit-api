@@ -5,7 +5,6 @@ data class CommentWithEmoticons(
     val userName: String,
     val userProfileImageUrl: String?,
     val emoticons: List<EmoticonSummary>,
-    val replies: List<CommentWithEmoticons> = emptyList(),
 ) {
     fun deIdentified(): CommentWithEmoticons =
         copy(

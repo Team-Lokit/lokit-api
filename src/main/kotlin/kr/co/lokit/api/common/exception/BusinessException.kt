@@ -176,24 +176,6 @@ sealed class BusinessException(
         errors: Map<String, String> = emptyMap(),
     ) : BusinessException(ErrorCode.EMOTICON_ALREADY_EXISTS, message, cause, errors)
 
-    class ReplyDepthExceededException(
-        message: String = ErrorCode.REPLY_DEPTH_EXCEEDED.message,
-        cause: Throwable? = null,
-        errors: Map<String, String> = emptyMap(),
-    ) : BusinessException(ErrorCode.REPLY_DEPTH_EXCEEDED, message, cause, errors)
-
-    class CommentAlreadyRemovedException(
-        message: String = ErrorCode.COMMENT_ALREADY_REMOVED.message,
-        cause: Throwable? = null,
-        errors: Map<String, String> = emptyMap(),
-    ) : BusinessException(ErrorCode.COMMENT_ALREADY_REMOVED, message, cause, errors)
-
-    class ReplyToRemovedNotAllowedException(
-        message: String = ErrorCode.REPLY_TO_REMOVED_NOT_ALLOWED.message,
-        cause: Throwable? = null,
-        errors: Map<String, String> = emptyMap(),
-    ) : BusinessException(ErrorCode.REPLY_TO_REMOVED_NOT_ALLOWED, message, cause, errors)
-
     class CoupleReconnectExpiredException(
         message: String = ErrorCode.COUPLE_RECONNECT_EXPIRED.message,
         cause: Throwable? = null,

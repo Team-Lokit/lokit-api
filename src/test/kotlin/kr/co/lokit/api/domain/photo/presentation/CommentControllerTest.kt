@@ -125,33 +125,6 @@ class CommentControllerTest {
     }
 
     @Test
-    fun `답글 생성 성공`() {
-        val savedReply = createComment(id = 2L, parentId = 1L, content = "답글")
-        doReturn(savedReply).`when`(commentUseCase).createReply(anyLong(), anyLong(), anyObject())
-
-        mockMvc.perform(
-            post("/photos/comments/1/replies")
-                .with(authentication(userAuth()))
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(CreateCommentRequest("답글"))),
-        )
-            .andExpect(status().isCreated)
-    }
-
-    @Test
-    fun `답글 생성 실패 - 내용이 비어있음`() {
-        mockMvc.perform(
-            post("/photos/comments/1/replies")
-                .with(authentication(userAuth()))
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(mapOf("content" to ""))),
-        )
-            .andExpect(status().isBadRequest)
-    }
-
-    @Test
     fun `댓글 수정 성공`() {
         val updated = createComment(id = 1L, content = "수정된 댓글")
         doReturn(updated).`when`(commentUseCase).updateComment(anyLong(), anyLong(), anyObject())
