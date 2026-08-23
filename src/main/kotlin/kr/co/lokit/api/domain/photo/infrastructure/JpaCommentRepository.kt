@@ -1,6 +1,9 @@
 package kr.co.lokit.api.domain.photo.infrastructure
 
+import kr.co.lokit.api.common.exception.BusinessException
+import kr.co.lokit.api.common.exception.ErrorField
 import kr.co.lokit.api.common.exception.entityNotFound
+import kr.co.lokit.api.common.exception.errorDetailsOf
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.domain.Comment
 import kr.co.lokit.api.domain.photo.domain.CommentWithEmoticons
@@ -99,5 +102,17 @@ class JpaCommentRepository(
 
     override fun deleteHard(id: Long) {
         commentJpaRepository.deleteById(id)
+    }
+
+    override fun findOwnerUserIdIncludingDeleted(id: Long): Long? = commentJpaRepository.findOwnerUserIdIncludingDeleted(id)
+
+    override fun restoreDeleted(id: Long): Comment {
+        val restoredCount = commentJpaRepository.restoreDeleted(id)
+        if (restoredCount == 0) {
+            throw BusinessException.CommentNotDeletedException(
+                errors = errorDetailsOf(ErrorField.COMMENT_ID to id),
+            )
+        }
+        return findById(id)
     }
 }

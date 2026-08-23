@@ -59,9 +59,9 @@ enum class ErrorCode(
     DEFAULT_ALBUM_NOT_FOUND_FOR_USER(HttpStatus.INTERNAL_SERVER_ERROR, "PHOTO_001", "사용자의 기본 앨범을 찾을 수 없습니다"),
 
     // Comment
-    COMMENT_MAX_EMOTICONS_EXCEEDED(HttpStatus.BAD_REQUEST, "COMMENT_001", "댓글당 최대 10개의 이모지만 추가할 수 있습니다"),
     EMOTICON_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_002", "이모지를 찾을 수 없습니다"),
     EMOTICON_ALREADY_EXISTS(HttpStatus.CONFLICT, "COMMENT_003", "이미 동일한 이모지를 추가했습니다"),
+    COMMENT_NOT_DELETED(HttpStatus.BAD_REQUEST, "COMMENT_004", "삭제되지 않은 댓글은 복구할 수 없습니다"),
 
     // Couple
     COUPLE_MAX_MEMBERS_EXCEEDED(HttpStatus.BAD_REQUEST, "COUPLE_001", "커플 최대 인원을 초과했습니다"),

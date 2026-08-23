@@ -11,11 +11,6 @@ interface EmoticonRepositoryPort {
         emoji: String,
     )
 
-    fun countByCommentIdAndUserId(
-        commentId: Long,
-        userId: Long,
-    ): Long
-
     fun existsByCommentIdAndUserIdAndEmoji(
         commentId: Long,
         userId: Long,

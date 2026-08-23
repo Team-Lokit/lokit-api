@@ -29,4 +29,8 @@ interface CommentRepositoryPort {
     ): Comment
 
     fun deleteHard(id: Long)
+
+    fun findOwnerUserIdIncludingDeleted(id: Long): Long?
+
+    fun restoreDeleted(id: Long): Comment
 }

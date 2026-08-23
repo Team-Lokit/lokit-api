@@ -25,4 +25,9 @@ interface CommentUseCase {
         commentId: Long,
         userId: Long,
     )
+
+    fun restoreComment(
+        commentId: Long,
+        userId: Long,
+    ): Comment
 }

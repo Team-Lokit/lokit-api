@@ -73,6 +73,16 @@ class CommentController(
         @PathVariable commentId: Long,
     ) = commentUseCase.deleteComment(commentId, userId)
 
+    @PostMapping("comments/{commentId}/restore")
+    @PreAuthorize("@permissionService.canRestoreComment(#userId, #commentId)")
+    override fun restoreComment(
+        @CurrentUserId userId: Long,
+        @PathVariable commentId: Long,
+    ): IdResponse =
+        commentUseCase
+            .restoreComment(commentId, userId)
+            .toIdResponse(Comment::id)
+
     @PostMapping("comments/{commentId}/emoticons")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@permissionService.canAccessComment(#userId, #commentId)")

@@ -7,6 +7,7 @@ import kr.co.lokit.api.domain.album.application.port.AlbumRepositoryPort
 import kr.co.lokit.api.domain.album.domain.Album
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
+import kr.co.lokit.api.domain.photo.domain.Comment
 import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.UserRepositoryPort
 import kr.co.lokit.api.domain.user.domain.User
@@ -126,6 +127,18 @@ class PermissionService(
         userId: Long,
         commentId: Long,
     ): Boolean = canModifyComment(userId, commentId)
+
+    fun canRestoreComment(
+        userId: Long,
+        commentId: Long,
+    ): Boolean {
+        if (isAdmin(userId)) return true
+
+        val ownerUserId =
+            commentRepository.findOwnerUserIdIncludingDeleted(commentId)
+                ?: throw entityNotFound<Comment>(commentId)
+        return ownerUserId == userId
+    }
 
     private fun getUserRole(userId: Long): UserRole =
         userRepository.findById(userId)?.role

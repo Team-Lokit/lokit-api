@@ -39,11 +39,6 @@ class JpaEmoticonRepository(
         emoticonJpaRepository.delete(entity)
     }
 
-    override fun countByCommentIdAndUserId(
-        commentId: Long,
-        userId: Long,
-    ): Long = emoticonJpaRepository.countByCommentIdAndUserId(commentId, userId)
-
     override fun existsByCommentIdAndUserIdAndEmoji(
         commentId: Long,
         userId: Long,

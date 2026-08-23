@@ -58,6 +58,12 @@ class CommentService(
     }
 
     @Transactional
+    override fun restoreComment(
+        commentId: Long,
+        userId: Long,
+    ): Comment = commentRepository.restoreDeleted(commentId)
+
+    @Transactional
     override fun addEmoticon(
         commentId: Long,
         userId: Long,
@@ -70,16 +76,6 @@ class CommentService(
                         ErrorField.COMMENT_ID to commentId,
                         ErrorField.USER_ID to userId,
                         ErrorField.EMOJI to emoji,
-                    ),
-            )
-        }
-        val count = emoticonRepository.countByCommentIdAndUserId(commentId, userId)
-        if (!Emoticon.canAdd(count)) {
-            throw BusinessException.CommentMaxEmoticonsExceededException(
-                errors =
-                    errorDetailsOf(
-                        ErrorField.COMMENT_ID to commentId,
-                        ErrorField.USER_ID to userId,
                     ),
             )
         }
