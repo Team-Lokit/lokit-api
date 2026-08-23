@@ -92,15 +92,33 @@ interface CommentApi {
     )
 
     @Operation(
+        summary = "댓글 삭제 취소",
+        description = "본인이 삭제한 댓글을 삭제 이전 상태로 복구합니다. 단건 댓글에 대해서만 동작합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "댓글 삭제 취소 성공"),
+            ApiResponse(responseCode = "400", description = "삭제되지 않은 댓글 (COMMENT_004)", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "본인 댓글이 아님", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "댓글을 찾을 수 없음", content = [Content()]),
+        ],
+    )
+    fun restoreComment(
+        @Parameter(hidden = true) userId: Long,
+        @Parameter(description = "댓글 ID", example = "1", required = true) commentId: Long,
+    ): IdResponse
+
+    @Operation(
         summary = "이모지 추가",
-        description = "댓글에 이모지를 추가합니다. 사용자당 댓글당 최대 10개의 서로 다른 이모지를 추가할 수 있습니다.",
+        description = "댓글에 이모지를 추가합니다.",
     )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "201", description = "이모지 추가 성공"),
             ApiResponse(
                 responseCode = "400",
-                description = "이모지 최대 개수 초과 (COMMENT_001) 또는 저장 가능한 길이를 넘는 이모지 (COMMON_001)",
+                description = "저장 가능한 길이를 넘는 이모지 (COMMON_001)",
                 content = [Content()],
             ),
             ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),

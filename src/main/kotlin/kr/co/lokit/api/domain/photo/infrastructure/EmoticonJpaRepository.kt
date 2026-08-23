@@ -12,11 +12,6 @@ interface EmoticonJpaRepository : JpaRepository<EmoticonEntity, Long> {
         emoji: String,
     ): EmoticonEntity?
 
-    fun countByCommentIdAndUserId(
-        commentId: Long,
-        userId: Long,
-    ): Long
-
     fun existsByCommentIdAndUserIdAndEmoji(
         commentId: Long,
         userId: Long,

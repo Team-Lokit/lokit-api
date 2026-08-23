@@ -266,4 +266,30 @@ class PermissionServiceTest {
 
         assert(!permissionService.canDeleteComment(2L, 1L))
     }
+
+    @Test
+    fun `작성자는 삭제한 댓글을 복구할 수 있다`() {
+        val user = createUser(id = 1L, role = UserRole.USER)
+        `when`(userRepository.findById(1L)).thenReturn(user)
+        `when`(commentRepository.findOwnerUserIdIncludingDeleted(1L)).thenReturn(1L)
+
+        assert(permissionService.canRestoreComment(1L, 1L))
+    }
+
+    @Test
+    fun `작성자가 아니면 삭제한 댓글을 복구할 수 없다`() {
+        val user = createUser(id = 2L, role = UserRole.USER)
+        `when`(userRepository.findById(2L)).thenReturn(user)
+        `when`(commentRepository.findOwnerUserIdIncludingDeleted(1L)).thenReturn(1L)
+
+        assert(!permissionService.canRestoreComment(2L, 1L))
+    }
+
+    @Test
+    fun `Admin은 타인의 삭제한 댓글도 복구할 수 있다`() {
+        val adminUser = createUser(id = 1L, role = UserRole.ADMIN)
+        `when`(userRepository.findById(1L)).thenReturn(adminUser)
+
+        assert(permissionService.canRestoreComment(1L, 999L))
+    }
 }

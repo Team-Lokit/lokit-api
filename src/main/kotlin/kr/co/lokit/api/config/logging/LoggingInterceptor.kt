@@ -74,7 +74,7 @@ class LoggingInterceptor(
         if (verbose) {
             logVerbose(request, wrappedRequest, wrappedResponse, status, latency, ex)
         } else {
-            logCompact(status, ex)
+            logCompact(request, status, latency, ex)
         }
     }
 
@@ -86,14 +86,11 @@ class LoggingInterceptor(
         latency: Long,
         ex: Exception?,
     ) {
-        val method = request.method
-        val uri = request.requestURI
-        val query = request.queryString?.let { "?$it" }.orEmpty()
         val requestBody = wrappedRequest?.let { getBody(it.contentAsByteArray, it.contentType) }.orEmpty()
         val responseBody = wrappedResponse?.let { getBody(it.contentAsByteArray, it.contentType) }.orEmpty()
 
         val sb = StringBuilder()
-        sb.appendLine("$method $uri$query → $status (${latency}ms)")
+        sb.appendLine(requestSummary(request, status, latency))
 
         if (requestBody.isNotEmpty()) {
             sb.appendLine(">>> $requestBody")
@@ -110,10 +107,34 @@ class LoggingInterceptor(
     }
 
     private fun logCompact(
+        request: HttpServletRequest,
         status: Int,
+        latency: Long,
         ex: Exception?,
     ) {
-        logAtLevel(status, ex, "request completed")
+        val summary = requestSummary(request, status, latency)
+        val traceSummary = summarizeTraces(RequestTrace.drain())
+        val message = if (traceSummary != null) "$summary $traceSummary" else summary
+
+        logAtLevel(status, ex, message)
+    }
+
+    private fun requestSummary(
+        request: HttpServletRequest,
+        status: Int,
+        latency: Long,
+    ): String {
+        val method = request.method
+        val uri = request.requestURI
+        val query = request.queryString?.let { "?$it" }.orEmpty()
+        return "$method $uri$query → $status (${latency}ms)"
+    }
+
+    private fun summarizeTraces(traces: List<RequestTrace.TraceHistory>): String? {
+        if (traces.isEmpty()) return null
+        val slowest = traces.maxBy { it.durationMs }
+        val traceMs = traces.sumOf { it.durationMs }
+        return "[calls=${traces.size}, traceMs=$traceMs, slowest=${slowest.method}(${slowest.durationMs}ms)]"
     }
 
     private fun shouldSkipLogging(request: HttpServletRequest): Boolean =

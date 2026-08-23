@@ -96,6 +96,62 @@ class CommentRepositoryTest {
     }
 
     @Test
+    fun `삭제된 댓글은 목록에서 사라지고 복구하면 다시 나타난다`() {
+        val photoId = photo.nonNullId()
+        val saved =
+            commentJpaRepository.save(
+                CommentEntity(photo = photo, user = author, content = "댓글", commentedAt = LocalDate.now()),
+            )
+        commentJpaRepository.flush()
+        val commentId = saved.nonNullId()
+        entityManager.clear()
+
+        commentJpaRepository.deleteById(commentId)
+        commentJpaRepository.flush()
+        entityManager.clear()
+
+        assertEquals(0, commentJpaRepository.findAllByPhotoId(photoId).size)
+
+        val restoredCount = commentJpaRepository.restoreDeleted(commentId)
+        entityManager.clear()
+
+        assertEquals(1, restoredCount)
+        assertEquals(1, commentJpaRepository.findAllByPhotoId(photoId).size)
+    }
+
+    @Test
+    fun `findOwnerUserIdIncludingDeleted는 삭제된 댓글의 작성자도 조회한다`() {
+        val authorId = author.nonNullId()
+        val saved =
+            commentJpaRepository.save(
+                CommentEntity(photo = photo, user = author, content = "댓글", commentedAt = LocalDate.now()),
+            )
+        commentJpaRepository.flush()
+        val commentId = saved.nonNullId()
+        entityManager.clear()
+
+        commentJpaRepository.deleteById(commentId)
+        commentJpaRepository.flush()
+        entityManager.clear()
+
+        assertEquals(authorId, commentJpaRepository.findOwnerUserIdIncludingDeleted(commentId))
+    }
+
+    @Test
+    fun `삭제되지 않은 댓글을 복구하려 하면 0건이 갱신된다`() {
+        val saved =
+            commentJpaRepository.save(
+                CommentEntity(photo = photo, user = author, content = "댓글", commentedAt = LocalDate.now()),
+            )
+        commentJpaRepository.flush()
+        entityManager.clear()
+
+        val restoredCount = commentJpaRepository.restoreDeleted(saved.nonNullId())
+
+        assertEquals(0, restoredCount)
+    }
+
+    @Test
     fun `사진 업로더가 탈퇴해도 findByIdWithRelations는 사진을 계속 찾는다`() {
         val photoId = photo.nonNullId()
         val ownerId = owner.nonNullId()

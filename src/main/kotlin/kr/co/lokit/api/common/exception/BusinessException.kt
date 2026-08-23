@@ -164,17 +164,17 @@ sealed class BusinessException(
     ) : BusinessException(ErrorCode.ALBUM_ALREADY_EXISTS, message, cause, errors)
 
     // Comment
-    class CommentMaxEmoticonsExceededException(
-        message: String = ErrorCode.COMMENT_MAX_EMOTICONS_EXCEEDED.message,
-        cause: Throwable? = null,
-        errors: Map<String, String> = emptyMap(),
-    ) : BusinessException(ErrorCode.COMMENT_MAX_EMOTICONS_EXCEEDED, message, cause, errors)
-
     class EmoticonAlreadyExistsException(
         message: String = ErrorCode.EMOTICON_ALREADY_EXISTS.message,
         cause: Throwable? = null,
         errors: Map<String, String> = emptyMap(),
     ) : BusinessException(ErrorCode.EMOTICON_ALREADY_EXISTS, message, cause, errors)
+
+    class CommentNotDeletedException(
+        message: String = ErrorCode.COMMENT_NOT_DELETED.message,
+        cause: Throwable? = null,
+        errors: Map<String, String> = emptyMap(),
+    ) : BusinessException(ErrorCode.COMMENT_NOT_DELETED, message, cause, errors)
 
     class CoupleReconnectExpiredException(
         message: String = ErrorCode.COUPLE_RECONNECT_EXPIRED.message,

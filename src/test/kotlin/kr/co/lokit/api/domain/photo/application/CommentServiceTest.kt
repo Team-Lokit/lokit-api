@@ -54,7 +54,6 @@ class CommentServiceTest {
     fun `이모지를 추가할 수 있다`() {
         val savedEmoticon = createEmoticon(id = 1L, commentId = 1L, userId = 1L, emoji = "❤️")
         `when`(emoticonRepository.existsByCommentIdAndUserIdAndEmoji(1L, 1L, "❤️")).thenReturn(false)
-        `when`(emoticonRepository.countByCommentIdAndUserId(1L, 1L)).thenReturn(0)
         `when`(emoticonRepository.save(any())).thenReturn(savedEmoticon)
 
         val result = commentService.addEmoticon(1L, 1L, "❤️")
@@ -68,16 +67,6 @@ class CommentServiceTest {
         `when`(emoticonRepository.existsByCommentIdAndUserIdAndEmoji(1L, 1L, "❤️")).thenReturn(true)
 
         assertThrows<BusinessException.EmoticonAlreadyExistsException> {
-            commentService.addEmoticon(1L, 1L, "❤️")
-        }
-    }
-
-    @Test
-    fun `이모지가 최대 개수를 초과하면 예외가 발생한다`() {
-        `when`(emoticonRepository.existsByCommentIdAndUserIdAndEmoji(1L, 1L, "❤️")).thenReturn(false)
-        `when`(emoticonRepository.countByCommentIdAndUserId(1L, 1L)).thenReturn(10)
-
-        assertThrows<BusinessException.CommentMaxEmoticonsExceededException> {
             commentService.addEmoticon(1L, 1L, "❤️")
         }
     }
@@ -104,6 +93,26 @@ class CommentServiceTest {
         commentService.deleteComment(1L, 1L)
 
         verify(commentRepository).deleteHard(1L)
+    }
+
+    @Test
+    fun `삭제한 댓글을 복구할 수 있다`() {
+        val restored = createComment(id = 1L, photoId = 10L, userId = 1L)
+        `when`(commentRepository.restoreDeleted(1L)).thenReturn(restored)
+
+        val result = commentService.restoreComment(1L, 1L)
+
+        assertEquals(1L, result.id)
+        verify(commentRepository).restoreDeleted(1L)
+    }
+
+    @Test
+    fun `삭제되지 않은 댓글은 복구할 수 없다`() {
+        `when`(commentRepository.restoreDeleted(1L)).thenThrow(BusinessException.CommentNotDeletedException())
+
+        assertThrows<BusinessException.CommentNotDeletedException> {
+            commentService.restoreComment(1L, 1L)
+        }
     }
 
     @Test

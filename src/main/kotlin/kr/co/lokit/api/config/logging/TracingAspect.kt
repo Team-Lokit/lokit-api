@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
 
 @Aspect
 @Component
-@Profile("local", "dev")
+@Profile("local", "dev", "prod")
 class TracingAspect {
     @Around(
         """

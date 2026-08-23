@@ -164,6 +164,19 @@ class CommentControllerTest {
     }
 
     @Test
+    fun `댓글 삭제 취소 성공`() {
+        val restored = createComment(id = 1L)
+        doReturn(restored).`when`(commentUseCase).restoreComment(anyLong(), anyLong())
+
+        mockMvc.perform(
+            post("/photos/comments/1/restore")
+                .with(authentication(userAuth()))
+                .with(csrf()),
+        )
+            .andExpect(status().isOk)
+    }
+
+    @Test
     fun `이모지 추가 성공`() {
         val savedEmoticon = createEmoticon(id = 1L, emoji = "❤️")
         doReturn(savedEmoticon).`when`(emoticonUseCase).addEmoticon(anyLong(), anyLong(), anyObject())
