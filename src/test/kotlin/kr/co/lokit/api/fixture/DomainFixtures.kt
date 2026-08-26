@@ -7,6 +7,11 @@ import kr.co.lokit.api.domain.album.domain.Album
 import kr.co.lokit.api.domain.couple.domain.Couple
 import kr.co.lokit.api.domain.map.domain.AlbumBounds
 import kr.co.lokit.api.domain.map.domain.BoundsIdType
+import kr.co.lokit.api.domain.notification.domain.DevicePlatform
+import kr.co.lokit.api.domain.notification.domain.DeviceToken
+import kr.co.lokit.api.domain.notification.domain.Notification
+import kr.co.lokit.api.domain.notification.domain.NotificationType
+import kr.co.lokit.api.domain.notification.domain.PendingUploadNotification
 import kr.co.lokit.api.domain.photo.domain.Comment
 import kr.co.lokit.api.domain.photo.domain.Emoticon
 import kr.co.lokit.api.domain.photo.domain.Location
@@ -141,4 +146,73 @@ fun createAlbumBounds(
     maxLongitude = maxLongitude,
     minLatitude = minLatitude,
     maxLatitude = maxLatitude,
+)
+
+fun createDeviceToken(
+    id: Long = 0L,
+    userId: Long = 1L,
+    token: String = "fcm-token-1",
+    platform: DevicePlatform = DevicePlatform.ANDROID,
+) = DeviceToken(
+    id = id,
+    userId = userId,
+    token = token,
+    platform = platform,
+)
+
+/**
+ * sentAt 은 고정 상수다. LocalDateTime.now() 기준 상대 시각을 쓰면
+ * 그룹 윈도우 경계(정확히 5분)를 다루는 테스트가 실행 시점에 따라 흔들린다.
+ */
+fun createNotification(
+    id: Long = 1L,
+    notifId: String = "notif-1",
+    recipientUserId: Long = 1L,
+    actorUserId: Long = 2L,
+    notificationType: NotificationType = NotificationType.COMMENT,
+    targetPhotoId: Long = 10L,
+    groupCount: Int = 1,
+    title: String = "새 댓글",
+    body: String = "상대방님이 댓글을 남겼어요",
+    isRead: Boolean = false,
+    sentAt: LocalDateTime = LocalDateTime.of(2026, 1, 1, 12, 0),
+    groupClosedAt: LocalDateTime? = null,
+    targetAddress: String? = null,
+) = Notification(
+    id = id,
+    notifId = notifId,
+    recipientUserId = recipientUserId,
+    actorUserId = actorUserId,
+    notificationType = notificationType,
+    targetPhotoId = targetPhotoId,
+    groupCount = groupCount,
+    title = title,
+    body = body,
+    isRead = isRead,
+    sentAt = sentAt,
+    groupClosedAt = groupClosedAt,
+    targetAddress = targetAddress,
+)
+
+/**
+ * scheduledAt 은 고정 상수다(계약 2-19). now 기준 상대 시각을 쓰면
+ * isDue 경계(now == scheduledAt)를 다루는 테스트가 실행 시점에 따라 흔들린다.
+ * recipientUserId != actorUserId 는 도메인 불변식이라 기본값이 서로 달라야 한다.
+ */
+fun createPendingUploadNotification(
+    id: Long = 1L,
+    coupleId: Long = 1L,
+    recipientUserId: Long = 1L,
+    actorUserId: Long = 2L,
+    photoIds: List<Long> = listOf(10L),
+    scheduledAt: LocalDateTime = LocalDateTime.of(2026, 1, 1, 12, 10),
+    sentAt: LocalDateTime? = null,
+) = PendingUploadNotification(
+    id = id,
+    coupleId = coupleId,
+    recipientUserId = recipientUserId,
+    actorUserId = actorUserId,
+    photoIds = photoIds,
+    scheduledAt = scheduledAt,
+    sentAt = sentAt,
 )

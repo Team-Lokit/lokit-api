@@ -20,3 +20,10 @@ server:
     servlet:
         context-path: /api
     shutdown: graceful
+
+notification:
+    push:
+        enabled: false
+        fcm:
+            project-id: ""
+            credentials-location: ""

@@ -2,6 +2,7 @@ package kr.co.lokit.api.domain.user.application
 
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.config.security.JwtTokenProvider
+import kr.co.lokit.api.domain.notification.application.port.`in`.DeleteDeviceTokensUseCase
 import kr.co.lokit.api.domain.user.application.port.RefreshTokenRecord
 import kr.co.lokit.api.domain.user.application.port.RefreshTokenRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.UserRepositoryPort
@@ -29,6 +30,9 @@ class AuthServiceTest {
 
     @Mock
     lateinit var jwtTokenProvider: JwtTokenProvider
+
+    @Mock
+    lateinit var deleteDeviceTokensUseCase: DeleteDeviceTokensUseCase
 
     @InjectMocks
     lateinit var authService: AuthService
@@ -107,6 +111,13 @@ class AuthServiceTest {
         authService.logout(1L)
 
         verify(refreshTokenRepository).deleteByUserId(1L)
+    }
+
+    @Test
+    fun `로그아웃 시 디바이스 토큰이 전부 삭제된다`() {
+        authService.logout(1L)
+
+        verify(deleteDeviceTokensUseCase).deleteAllByUserId(1L)
     }
 
     @Test

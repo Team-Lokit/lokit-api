@@ -24,4 +24,7 @@ interface PhotoRepositoryPort {
         coupleId: Long,
         offset: Int,
     ): String?
+
+    /** D6: 없거나 소프트삭제된 id는 예외 없이 결과에서 빠진다. 빈 입력이면 DB를 조회하지 않는다. 순서 미보장. */
+    fun findAllByIds(ids: List<Long>): List<Photo>
 }

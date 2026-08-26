@@ -46,6 +46,9 @@ dependencies {
     implementation(platform("software.amazon.awssdk:bom:2.31.21"))
     implementation("software.amazon.awssdk:s3")
 
+    // FCM (서비스계정 OAuth2)
+    implementation("com.google.auth:google-auth-library-oauth2-http:1.30.1")
+
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.0")
