@@ -4,7 +4,9 @@ import kr.co.lokit.api.common.analytics.application.port.AppEventLogPort
 import kr.co.lokit.api.common.concurrency.LockManager
 import kr.co.lokit.api.domain.notification.application.port.DeviceTokenRepositoryPort
 import kr.co.lokit.api.domain.notification.application.port.NotificationRepositoryPort
+import kr.co.lokit.api.domain.notification.application.port.NotificationSettingsRepositoryPort
 import kr.co.lokit.api.domain.notification.application.port.PushSenderPort
+import kr.co.lokit.api.domain.notification.application.port.findOrDefault
 import kr.co.lokit.api.domain.notification.domain.Notification
 import kr.co.lokit.api.domain.notification.domain.NotificationMessage
 import kr.co.lokit.api.domain.notification.domain.NotificationType
@@ -18,7 +20,8 @@ import java.util.UUID
 /**
  * 클래스에 @Transactional 없음(D5) — DB 쓰기는 lockManager.withLock의 REQUIRES_NEW 트랜잭션과
  * 어댑터 메서드의 @Transactional 안에서만. 외부 HTTP는 항상 트랜잭션·락 밖.
- * 알려진 갭: 알림 설정(종류별 스위치)은 슬라이스5 통합 예정. 이번엔 전역 flag(pushSenderPort 존재)만 확인.
+ * 푸시 발송 조건은 두 단계다: 전역 flag(pushSenderPort 존재) → 수신자별 알림 설정(종류별 스위치).
+ * 둘 다 sendPush 한 곳에서만 검사한다(공개 진입점 3개가 모두 이 private 을 경유).
  */
 @Service
 class NotificationDispatchService(
@@ -27,6 +30,7 @@ class NotificationDispatchService(
     private val userRepository: UserRepositoryPort,
     private val appEventLogPort: AppEventLogPort,
     private val lockManager: LockManager,
+    private val notificationSettingsRepository: NotificationSettingsRepositoryPort,
     private val pushSenderPort: PushSenderPort?,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -123,6 +127,15 @@ class NotificationDispatchService(
                 log.debug("푸시 비활성화 상태 — 알림함만 저장: notifId={}", notification.notifId)
                 return
             }
+        val settings = notificationSettingsRepository.findOrDefault(notification.recipientUserId)
+        if (!settings.isPushEnabledFor(notification.notificationType)) {
+            log.debug(
+                "수신자 알림 설정 OFF — 알림함만 저장: notifId={}, type={}",
+                notification.notifId,
+                notification.notificationType,
+            )
+            return
+        }
         val tokens = deviceTokenRepository.findAllByUserId(notification.recipientUserId).map { it.token }
         if (tokens.isEmpty()) {
             log.debug("등록된 디바이스 토큰 없음 — 발송 생략: notifId={}", notification.notifId)

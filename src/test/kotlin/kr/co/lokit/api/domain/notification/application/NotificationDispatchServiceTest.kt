@@ -4,8 +4,10 @@ import kr.co.lokit.api.common.analytics.application.port.AppEventLogPort
 import kr.co.lokit.api.common.concurrency.LockManager
 import kr.co.lokit.api.domain.notification.application.port.DeviceTokenRepositoryPort
 import kr.co.lokit.api.domain.notification.application.port.NotificationRepositoryPort
+import kr.co.lokit.api.domain.notification.application.port.NotificationSettingsRepositoryPort
 import kr.co.lokit.api.domain.notification.application.port.PushSenderPort
 import kr.co.lokit.api.domain.notification.domain.Notification
+import kr.co.lokit.api.domain.notification.domain.NotificationSettings
 import kr.co.lokit.api.domain.notification.domain.NotificationType
 import kr.co.lokit.api.domain.notification.domain.PushMessage
 import kr.co.lokit.api.domain.notification.domain.PushSendResult
@@ -47,6 +49,14 @@ class NotificationDispatchServiceTest {
     @Mock
     lateinit var appEventLogPort: AppEventLogPort
 
+    /**
+     * 발송 게이트의 협력자(계약 0-3). 반환 타입이 nullable 이므로 기존 11개 테스트는
+     * 스텁을 추가하지 않는다 — 미스텁 호출은 Mockito 기본값 null 이고,
+     * 게이트가 `?: NotificationSettings.defaultsFor(...)` 로 이를 "전부 ON"으로 흡수한다.
+     */
+    @Mock
+    lateinit var notificationSettingsRepository: NotificationSettingsRepositoryPort
+
     @Mock
     lateinit var pushSenderPort: PushSenderPort
 
@@ -64,6 +74,7 @@ class NotificationDispatchServiceTest {
             userRepository,
             appEventLogPort,
             LockManager(),
+            notificationSettingsRepository,
             sender,
         )
 
@@ -333,6 +344,156 @@ class NotificationDispatchServiceTest {
 
         assertEquals(SAVED_ID, result.id)
         verify(notificationRepository).save(any())
+        verify(deviceTokenRepository, never()).findAllByUserId(any())
+        verify(appEventLogPort, never()).record(any(), anyOrNull(), anyOrNull(), anyOrNull(), any())
+    }
+
+    // ── 발송 게이트 (계약 §4-C). 게이트는 sendPush 내부 1곳이며 세 경로 전부를 덮는다(D-1). ──
+
+    @Test
+    fun `수신자가 알림을 전부 꺼두면 알림은 저장되지만 푸시하지 않는다`() {
+        givenNewWindow()
+        givenSettings(NotificationSettings(userId = RECIPIENT_ID, masterEnabled = false))
+
+        notifyComment()
+
+        // 알림함 row 는 설정과 무관하게 항상 남는다 — 게이트는 '발송'만 막는다.
+        verify(notificationRepository).save(any())
+        verifyPushSuppressed()
+    }
+
+    @Test
+    fun `게이트가 막으면 디바이스 토큰 조회조차 하지 않는다`() {
+        givenNewWindow()
+        givenSettings(NotificationSettings(userId = RECIPIENT_ID, masterEnabled = false))
+
+        notifyComment()
+
+        // 게이트가 토큰 조회 '앞'에 있어야만 통과한다 — 발송 파이프라인 상류 위치를 못박는다(경계면 #1).
+        verify(deviceTokenRepository, never()).findAllByUserId(any())
+        verify(pushSenderPort, never()).send(any())
+    }
+
+    @Test
+    fun `수신자가 해당 종류만 꺼두면 푸시하지 않는다`() {
+        givenNewWindow()
+        givenSettings(
+            NotificationSettings(
+                userId = RECIPIENT_ID,
+                disabledTypes = setOf(NotificationType.COMMENT),
+            ),
+        )
+
+        notifyComment()
+
+        verify(notificationRepository).save(any())
+        verifyPushSuppressed()
+    }
+
+    @Test
+    fun `다른 종류만 꺼져 있으면 정상 발송한다`() {
+        givenNewWindow(createNotification(notifId = "notif-9"))
+        givenSettings(
+            NotificationSettings(
+                userId = RECIPIENT_ID,
+                disabledTypes = setOf(NotificationType.REACTION),
+            ),
+        )
+        givenOneDeviceToken()
+
+        notifyComment()
+
+        // C3 의 위양성 방어: 게이트가 종류를 실제로 구분하지 않고 무조건 막는 구현은 여기서 깨진다.
+        verify(pushSenderPort).send(any())
+    }
+
+    @Test
+    fun `그룹 마감 요약 푸시도 수신자 설정을 따른다`() {
+        val window = createNotification(id = 42L, actorUserId = ACTOR_ID, groupCount = 3)
+        whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
+            createNotification(id = 42L, groupCount = 3, body = "지민님이 댓글 3개를 남겼어요", groupClosedAt = NOW),
+        )
+        givenSettings(NotificationSettings(userId = RECIPIENT_ID, masterEnabled = false))
+
+        service.closeGroupWindow(window, NOW)
+
+        // request.md 에 누락돼 있던 세 번째 발송 경로(스케줄러 → closeGroupWindow → 2차 요약 푸시).
+        verify(notificationRepository).closeGroupWindow(eq(42L), eq(NOW), any())
+        verifyPushSuppressed()
+    }
+
+    @Test
+    fun `dispatchImmediately도 수신자 설정을 따른다`() {
+        val notification = uploadNotification()
+        whenever(notificationRepository.save(any())).thenReturn(notification.copy(id = SAVED_ID))
+        givenSettings(
+            NotificationSettings(
+                userId = RECIPIENT_ID,
+                disabledTypes = setOf(NotificationType.UPLOAD),
+            ),
+        )
+
+        val result = service.dispatchImmediately(notification)
+
+        assertEquals(SAVED_ID, result.id)
+        verify(notificationRepository).save(any())
+        verifyPushSuppressed()
+    }
+
+    @Test
+    fun `게이트가 막으면 push_send 이벤트를 기록하지 않는다`() {
+        givenNewWindow()
+        givenSettings(NotificationSettings(userId = RECIPIENT_ID, masterEnabled = false))
+
+        notifyComment()
+
+        // 나가지 않은 푸시가 애널리틱스에 잡히면 발송률 지표가 오염된다(Q1).
+        verify(appEventLogPort, never()).record(any(), anyOrNull(), anyOrNull(), anyOrNull(), any())
+        verify(pushSenderPort, never()).send(any())
+    }
+
+    @Test
+    fun `설정을 저장한 적 없는 수신자에게는 정상 발송한다`() {
+        givenNewWindow(createNotification(notifId = "notif-9"))
+        givenSettings(null)
+        givenOneDeviceToken()
+
+        notifyComment()
+
+        // 기존 11개 테스트가 '미스텁 → null' 로 조용히 통과하는 것을 계약으로 고정한다(경계면 #15).
+        verify(pushSenderPort).send(any())
+    }
+
+    private fun givenNewWindow(saved: Notification = createNotification()) {
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+            .thenReturn(null)
+        whenever(notificationRepository.save(any())).thenReturn(saved)
+    }
+
+    private fun givenSettings(settings: NotificationSettings?) {
+        whenever(notificationSettingsRepository.findByUserId(RECIPIENT_ID)).thenReturn(settings)
+    }
+
+    private fun givenOneDeviceToken() {
+        whenever(deviceTokenRepository.findAllByUserId(RECIPIENT_ID)).thenReturn(
+            listOf(createDeviceToken(id = 1L, userId = RECIPIENT_ID, token = "fcm-a")),
+        )
+        whenever(pushSenderPort.send(any())).thenReturn(PushSendResult(successTokens = listOf("fcm-a")))
+    }
+
+    private fun notifyComment() {
+        service.notifyPhotoInteraction(
+            recipientUserId = RECIPIENT_ID,
+            actorUserId = ACTOR_ID,
+            targetPhotoId = PHOTO_ID,
+            notificationType = NotificationType.COMMENT,
+            now = NOW,
+        )
+    }
+
+    /** C1~C7 공통 어서션 세트(계약 §4-C). */
+    private fun verifyPushSuppressed() {
+        verify(pushSenderPort, never()).send(any())
         verify(deviceTokenRepository, never()).findAllByUserId(any())
         verify(appEventLogPort, never()).record(any(), anyOrNull(), anyOrNull(), anyOrNull(), any())
     }

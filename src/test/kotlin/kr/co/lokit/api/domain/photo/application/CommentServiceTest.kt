@@ -95,7 +95,6 @@ class CommentServiceTest {
     fun `이모지를 추가하면 사진 식별자를 담은 반응 이벤트가 발행된다`() {
         val savedEmoticon = createEmoticon(id = 5L, commentId = 1L, userId = 1L, emoji = "❤️")
         `when`(emoticonRepository.existsByCommentIdAndUserIdAndEmoji(1L, 1L, "❤️")).thenReturn(false)
-        `when`(emoticonRepository.countByCommentIdAndUserId(1L, 1L)).thenReturn(0)
         `when`(emoticonRepository.save(any())).thenReturn(savedEmoticon)
         `when`(commentRepository.findById(1L)).thenReturn(createComment(id = 1L, photoId = 10L, userId = 2L))
 
