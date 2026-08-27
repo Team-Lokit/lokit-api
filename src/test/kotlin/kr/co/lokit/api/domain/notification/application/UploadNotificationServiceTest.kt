@@ -145,6 +145,39 @@ class UploadNotificationServiceTest {
     }
 
     /**
+     * 커버리지 리뷰(슬라이스8)로 못박은 경로: 폴링과 fire 사이에 배치가 취소/삭제돼
+     * 재조회 결과 자체가 없는 경우도 isDue 불일치와 동일하게 조용히 아무것도 하지 않아야 한다.
+     */
+    @Test
+    fun `fire는 락 안에서 재조회했을 때 배치가 사라졌으면 아무것도 하지 않는다`() {
+        val pending = duePending()
+        whenever(pendingRepository.findUnsentByCoupleAndActor(1L, 2L)).thenReturn(null)
+
+        val result = service.fire(pending, now)
+
+        assertNull(result)
+        verify(pendingRepository, never()).markSent(any(), any())
+        verify(notificationDispatchService, never()).dispatchImmediately(any())
+    }
+
+    /**
+     * 커버리지 리뷰(슬라이스8)로 못박은 경로: 재조회 결과는 있지만(취소되지 않음) 다른 id로
+     * 대체된 배치라면(예: 마감 후 새 배치가 열림) 넘겨받은 pending과 다른 배치이므로 발송하지 않는다.
+     */
+    @Test
+    fun `fire는 락 안에서 재조회한 배치가 다른 id로 대체되었으면 아무것도 하지 않는다`() {
+        val pending = duePending()
+        val replacedByNewBatch = pending.copy(id = 99L)
+        whenever(pendingRepository.findUnsentByCoupleAndActor(1L, 2L)).thenReturn(replacedByNewBatch)
+
+        val result = service.fire(pending, now)
+
+        assertNull(result)
+        verify(pendingRepository, never()).markSent(any(), any())
+        verify(notificationDispatchService, never()).dispatchImmediately(any())
+    }
+
+    /**
      * 🔴 G-5: claim 이 발송보다 먼저다. 대상 사진이 전부 삭제돼 보낼 게 없어도 배치는 이미
      * 마감(markSent)된 상태로 남는다 — 되돌리면 다음 폴링이 같은 배치를 영원히 다시 집는다.
      */

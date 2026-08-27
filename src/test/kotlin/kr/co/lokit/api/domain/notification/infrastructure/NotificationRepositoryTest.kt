@@ -12,6 +12,7 @@ import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * 실 DB(H2 MODE=PostgreSQL, ddl-auto=create-drop) 실측 테스트.
@@ -42,6 +43,10 @@ class NotificationRepositoryTest {
         notificationJpaRepository.flush()
         entityManager.clear()
     }
+
+    /** @SoftDelete 필터를 우회해 실제 물리 행 수를 센다. count() 는 소프트삭제된 행을 빼고 세기 때문. */
+    private fun rawRowCount(): Long =
+        (entityManager.createNativeQuery("select count(*) from notification").singleResult as Number).toLong()
 
     @Test
     fun `마감되지 않은 알림 중 가장 최근 한 건만 돌려준다`() {
@@ -266,5 +271,182 @@ class NotificationRepositoryTest {
             else -> error("예상치 못한 is_read 컬럼 타입: ${raw?.javaClass}")
         }
         assertFalse(isReadColumn)
+    }
+
+    // ─────────────────────────── 슬라이스6: 알림함(inbox) ───────────────────────────
+
+    /** R9 — 파생 쿼리 이름이 실제로 recipient WHERE + sent_at DESC 로 번역되는가. */
+    @Test
+    fun `인박스는 수신자 본인 알림만 최신순으로 돌려준다`() {
+        repository.save(createNotification(notifId = "mine-old", recipientUserId = 1L, sentAt = now.minusDays(1)))
+        repository.save(createNotification(notifId = "mine-new", recipientUserId = 1L, sentAt = now))
+        // 남의 알림이 전체에서 가장 최신이다 — recipient 필터가 빠진 구현은 여기서 죽는다.
+        repository.save(createNotification(notifId = "others", recipientUserId = 2L, sentAt = now.plusDays(1)))
+        flushAndClear()
+
+        val inbox = repository.findInboxPage(recipientUserId = 1L, page = 0, size = 10)
+
+        assertEquals(listOf("mine-new", "mine-old"), inbox.map { it.notifId })
+    }
+
+    /**
+     * 🔴 R10 — 계약 D2 되돌리기 신호.
+     * 마감 전(group_closed_at is null) 알림도 목록에 나와야 한다. 푸시를 탭하고 5분 안에
+     * 인박스를 열면 방금 받은 알림이 거기 있어야 한다. 쿼리에 group_closed_at 조건을 끼우면
+     * 이 테스트가 빨개진다 — 그때 조건을 제거한다. 필터를 옵션 파라미터로 덧대는 땜질 금지.
+     */
+    @Test
+    fun `인박스는 그룹 윈도우가 열린 알림도 포함한다`() {
+        repository.save(
+            createNotification(
+                notifId = "open",
+                recipientUserId = 1L,
+                sentAt = now,
+                groupCount = 3,
+                groupClosedAt = null,
+            ),
+        )
+        repository.save(
+            createNotification(
+                notifId = "closed",
+                recipientUserId = 1L,
+                sentAt = now.minusHours(1),
+                groupClosedAt = now.minusMinutes(55),
+            ),
+        )
+        flushAndClear()
+
+        val inbox = repository.findInboxPage(recipientUserId = 1L, page = 0, size = 10)
+
+        assertEquals(listOf("open", "closed"), inbox.map { it.notifId })
+        // 문구는 저장된 그대로다(D1) — 조회 시점에 groupCount 로 재계산하지 않는다.
+        assertEquals("상대방님이 댓글을 남겼어요", inbox.first().body)
+        assertEquals(3, inbox.first().groupCount)
+    }
+
+    /**
+     * R11 — 동률 시 id 내림차순 2차 정렬(B7/F-신규-7). 없으면 offset 페이지 경계에서 행이 중복/누락된다.
+     * 픽스처의 sentAt 기본값이 고정 상수라 override 없이 저장하면 세 건이 그대로 동순위가 된다(E22).
+     *
+     * 이 테스트는 컨텍스트 로딩 단계도 겸해서 지킨다: OrderBySentAtDescIdDesc 의 Id 는
+     * BaseEntity(mapped superclass) 프로퍼티라 파생쿼리 해석이 실패하면 PropertyReferenceException 이
+     * 기동 시점에 난다(F-신규-11). 그러면 @Query 로 대체한다.
+     */
+    @Test
+    fun `sent_at이 같으면 id 내림차순으로 안정 정렬된다`() {
+        repository.save(createNotification(notifId = "tie-1", recipientUserId = 1L))
+        repository.save(createNotification(notifId = "tie-2", recipientUserId = 1L))
+        repository.save(createNotification(notifId = "tie-3", recipientUserId = 1L))
+        flushAndClear()
+
+        val firstPage = repository.findInboxPage(recipientUserId = 1L, page = 0, size = 2)
+        val secondPage = repository.findInboxPage(recipientUserId = 1L, page = 1, size = 2)
+
+        assertEquals(listOf("tie-3", "tie-2"), firstPage.map { it.notifId })
+        assertEquals(listOf("tie-1"), secondPage.map { it.notifId })
+    }
+
+    /**
+     * 🔴 R12 — 되돌리기 신호. 더티체킹이 진짜 UPDATE 를 내는지 네이티브로 실측한다.
+     * 반환값만 보면 복사본에 true 를 얹고 끝내는 구현도 초록이 된다.
+     * 컬럼명을 직접 지목하므로 Kotlin `is` 접두 프로퍼티가 `read` 로 잘리는 함정도 함께 막는다.
+     */
+    @Test
+    fun `읽음 처리가 실제 is_read 컬럼에 반영된다`() {
+        val saved = repository.save(createNotification(notifId = "to-read", isRead = false))
+        flushAndClear()
+
+        repository.markAsRead(saved.id)
+        flushAndClear()
+
+        assertTrue(rawIsRead(saved.id))
+    }
+
+    /**
+     * R13 — 멱등의 물리적 증명. 이미 true 인 필드에 true 를 다시 넣으면 Hibernate 더티체크가
+     * 변화 없음을 보고 UPDATE 를 내지 않는다 → @Version 이 오르지 않는다.
+     * 버전이 오르면 매번 읽음 API 호출이 쓸데없는 UPDATE 를 내고 있다는 뜻이다.
+     */
+    @Test
+    fun `이미 읽은 알림에 다시 읽음 처리해도 버전이 오르지 않는다`() {
+        val saved = repository.save(createNotification(notifId = "already-read", isRead = true))
+        flushAndClear()
+        val versionBefore = notificationJpaRepository.findById(saved.id).orElseThrow().version
+        flushAndClear()
+
+        repository.markAsRead(saved.id)
+        flushAndClear()
+
+        assertTrue(rawIsRead(saved.id))
+        assertEquals(versionBefore, notificationJpaRepository.findById(saved.id).orElseThrow().version)
+    }
+
+    /**
+     * 🔴 R14 — 되돌리기 신호. 경계는 strictly before 다.
+     * SentAtLessThanEqual 로 복사하면 정확히 컷오프 시각인 행이 한 건 더 지워진다(F-신규-3).
+     */
+    @Test
+    fun `30일이 지난 알림만 소프트삭제되고 경계 건은 남는다`() {
+        val cutoff = Notification.retentionCutoff(now)
+        repository.save(createNotification(notifId = "expired", recipientUserId = 1L, sentAt = cutoff.minusDays(1)))
+        repository.save(createNotification(notifId = "boundary", recipientUserId = 1L, sentAt = cutoff))
+        repository.save(createNotification(notifId = "fresh", recipientUserId = 1L, sentAt = now))
+        flushAndClear()
+
+        val deleted = repository.deleteSentBefore(sentAtBefore = cutoff, limit = 500)
+        flushAndClear()
+
+        assertEquals(1, deleted)
+        assertEquals(
+            listOf("fresh", "boundary"),
+            repository.findInboxPage(recipientUserId = 1L, page = 0, size = 10).map { it.notifId },
+        )
+    }
+
+    /**
+     * 🔴 R15 — 되돌리기 신호. 정리는 소프트삭제여야 한다(D5).
+     * deleteAll(entities) 로 구현하면 Hibernate 가 DELETE 를 is_deleted=true UPDATE 로 재작성하므로
+     * 물리 행은 남는다. 네이티브 DELETE 로 구현하면 여기서만 죽는다 — count() 는 두 구현을 구분하지 못한다.
+     */
+    @Test
+    fun `소프트삭제된 알림 행은 물리적으로 남아 있다`() {
+        val cutoff = Notification.retentionCutoff(now)
+        repository.save(createNotification(notifId = "expired", recipientUserId = 1L, sentAt = cutoff.minusDays(1)))
+        repository.save(createNotification(notifId = "fresh", recipientUserId = 1L, sentAt = now))
+        flushAndClear()
+
+        repository.deleteSentBefore(sentAtBefore = cutoff, limit = 500)
+        flushAndClear()
+
+        assertEquals(1L, notificationJpaRepository.count())
+        assertEquals(2L, rawRowCount())
+    }
+
+    /** R16 — countInbox 가 @SoftDelete 필터를 타는가. 정리된 알림이 페이지 메타에 남으면 totalPages 가 틀어진다. */
+    @Test
+    fun `인박스 카운트는 소프트삭제된 알림을 세지 않는다`() {
+        val cutoff = Notification.retentionCutoff(now)
+        repository.save(createNotification(notifId = "expired", recipientUserId = 1L, sentAt = cutoff.minusDays(1)))
+        repository.save(createNotification(notifId = "mine-1", recipientUserId = 1L, sentAt = now))
+        repository.save(createNotification(notifId = "mine-2", recipientUserId = 1L, sentAt = now.minusDays(1)))
+        repository.save(createNotification(notifId = "others", recipientUserId = 2L, sentAt = now))
+        flushAndClear()
+
+        repository.deleteSentBefore(sentAtBefore = cutoff, limit = 500)
+        flushAndClear()
+
+        assertEquals(2L, repository.countInbox(1L))
+    }
+
+    private fun rawIsRead(id: Long): Boolean {
+        val raw = entityManager
+            .createNativeQuery("select is_read from notification where id = :id")
+            .setParameter("id", id)
+            .singleResult
+        return when (raw) {
+            is Boolean -> raw
+            is Number -> raw.toInt() != 0
+            else -> error("예상치 못한 is_read 컬럼 타입: ${raw?.javaClass}")
+        }
     }
 }

@@ -159,6 +159,144 @@ class JpaNotificationRepositoryTest {
         verify(notificationJpaRepository, never()).save(any<NotificationEntity>())
     }
 
+    // ─────────────────────────── 슬라이스6: 알림함(inbox) ───────────────────────────
+
+    /** R2 — page/size 가 그대로 PageRequest.of(page, size) 로 간다. Sort 를 얹지 않는다(B16). */
+    @Test
+    fun `인박스 페이지를 PageRequest로 위임한다`() {
+        whenever(
+            notificationJpaRepository.findAllByRecipientUserIdOrderBySentAtDescIdDesc(any(), any()),
+        ).thenReturn(listOf(entity(notifId = "notif-42")))
+
+        repository.findInboxPage(recipientUserId = 7L, page = 2, size = 5)
+
+        val recipientCaptor = argumentCaptor<Long>()
+        val pageableCaptor = argumentCaptor<Pageable>()
+        verify(notificationJpaRepository)
+            .findAllByRecipientUserIdOrderBySentAtDescIdDesc(
+                recipientCaptor.capture(),
+                pageableCaptor.capture(),
+            )
+        assertEquals(7L, recipientCaptor.firstValue)
+        assertEquals(PageRequest.of(2, 5), pageableCaptor.firstValue)
+    }
+
+    /**
+     * R3 — 엔티티가 도메인으로 전 필드 복원되는가. isRead/targetAddress 를 기본값과 다르게 둔다:
+     * toDomain 이 그 둘을 흘리면 기본값(false/null)과 구분되지 않아 조용히 통과한다.
+     */
+    @Test
+    fun `인박스 조회 결과를 도메인으로 변환한다`() {
+        whenever(
+            notificationJpaRepository.findAllByRecipientUserIdOrderBySentAtDescIdDesc(any(), any()),
+        ).thenReturn(
+            listOf(
+                entity(
+                    notifId = "notif-42",
+                    recipientUserId = 7L,
+                    notificationType = NotificationType.REACTION,
+                    targetPhotoId = 99L,
+                    groupCount = 3,
+                    title = "새 반응",
+                    body = "지수님이 반응을 남겼어요",
+                    isRead = true,
+                    sentAt = SENT_AT,
+                    groupClosedAt = CLOSED_AT,
+                    targetAddress = "성동구 성수동",
+                ),
+            ),
+        )
+
+        val found = repository.findInboxPage(recipientUserId = 7L, page = 0, size = 20).single()
+
+        assertEquals("notif-42", found.notifId)
+        assertEquals(7L, found.recipientUserId)
+        assertEquals(NotificationType.REACTION, found.notificationType)
+        assertEquals(99L, found.targetPhotoId)
+        assertEquals(3, found.groupCount)
+        assertEquals("새 반응", found.title)
+        assertEquals("지수님이 반응을 남겼어요", found.body)
+        assertEquals(true, found.isRead)
+        assertEquals(SENT_AT, found.sentAt)
+        assertEquals(CLOSED_AT, found.groupClosedAt)
+        assertEquals("성동구 성수동", found.targetAddress)
+    }
+
+    /** R4 — 404/403 구분은 호출자 몫이다. 어댑터는 없으면 예외가 아니라 null 을 돌려준다(계약 2-2). */
+    @Test
+    fun `notifId로 조회하고 없으면 널을 반환한다`() {
+        whenever(notificationJpaRepository.findByNotifId("notif-42"))
+            .thenReturn(entity(notifId = "notif-42", recipientUserId = 7L))
+        whenever(notificationJpaRepository.findByNotifId("missing")).thenReturn(null)
+
+        assertEquals("notif-42", repository.findByNotifId("notif-42")?.notifId)
+        assertNull(repository.findByNotifId("missing"))
+    }
+
+    /**
+     * R5 — 더티체킹. save(notification.copy(isRead=true)) 로 구현하면 새 행이 INSERT 된다(F-신규-1).
+     * never().save(...) 가 그 구현을 잡는다.
+     */
+    @Test
+    fun `읽음 처리는 save를 부르지 않고 엔티티 플래그만 바꾼다`() {
+        val existing = entity(isRead = false)
+        whenever(notificationJpaRepository.findById(5L)).thenReturn(Optional.of(existing))
+
+        val read = repository.markAsRead(5L)
+
+        assertEquals(true, existing.isRead)
+        assertEquals(true, read.isRead)
+        verify(notificationJpaRepository, never()).save(any<NotificationEntity>())
+    }
+
+    /** R6 — 여기서 난 예외가 서비스를 거쳐 404 로 이어진다. */
+    @Test
+    fun `읽음 처리 대상이 없으면 entityNotFound를 던진다`() {
+        whenever(notificationJpaRepository.findById(5L)).thenReturn(Optional.empty())
+
+        assertThrows<BusinessException.ResourceNotFoundException> {
+            repository.markAsRead(5L)
+        }
+    }
+
+    /** R7 — 빈 결과에 deleteAll(emptyList()) 를 쏘지 않는다. */
+    @Test
+    fun `정리 대상이 없으면 삭제를 호출하지 않고 0을 반환한다`() {
+        whenever(
+            notificationJpaRepository.findAllBySentAtBeforeOrderBySentAtAsc(any(), any()),
+        ).thenReturn(emptyList())
+
+        assertEquals(0, repository.deleteSentBefore(SENT_AT, 500))
+
+        verify(notificationJpaRepository, never()).deleteAll(any<List<NotificationEntity>>())
+    }
+
+    /**
+     * R8 — deleteAll(entities) 를 타야 @SoftDelete 가 DELETE 를 is_deleted=true UPDATE 로 재작성한다.
+     * 네이티브 삭제로 구현하면 하드삭제가 된다(F-신규-2). 실제 물리 잔존 여부는 R15 가 실측한다.
+     */
+    @Test
+    fun `정리는 조회한 엔티티를 deleteAll로 넘기고 건수를 반환한다`() {
+        val targets = listOf(entity(notifId = "old-1"), entity(notifId = "old-2"))
+        whenever(
+            notificationJpaRepository.findAllBySentAtBeforeOrderBySentAtAsc(any(), any()),
+        ).thenReturn(targets)
+
+        val deleted = repository.deleteSentBefore(SENT_AT, 500)
+
+        val sentAtCaptor = argumentCaptor<LocalDateTime>()
+        val pageableCaptor = argumentCaptor<Pageable>()
+        verify(notificationJpaRepository)
+            .findAllBySentAtBeforeOrderBySentAtAsc(sentAtCaptor.capture(), pageableCaptor.capture())
+        assertEquals(SENT_AT, sentAtCaptor.firstValue)
+        assertEquals(PageRequest.of(0, 500), pageableCaptor.firstValue)
+
+        val deleteCaptor = argumentCaptor<List<NotificationEntity>>()
+        verify(notificationJpaRepository).deleteAll(deleteCaptor.capture())
+        assertEquals(listOf("old-1", "old-2"), deleteCaptor.firstValue.map { it.notifId })
+        assertEquals(2, deleted)
+    }
+
     private fun entity(
         notifId: String = "notif-1",
         recipientUserId: Long = 1L,
@@ -171,6 +309,7 @@ class JpaNotificationRepositoryTest {
         isRead: Boolean = false,
         sentAt: LocalDateTime = SENT_AT,
         groupClosedAt: LocalDateTime? = null,
+        targetAddress: String? = null,
     ) = NotificationEntity(
         notifId = notifId,
         recipientUserId = recipientUserId,
@@ -183,6 +322,7 @@ class JpaNotificationRepositoryTest {
         isRead = isRead,
         sentAt = sentAt,
         groupClosedAt = groupClosedAt,
+        targetAddress = targetAddress,
     )
 
     companion object {

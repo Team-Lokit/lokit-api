@@ -23,6 +23,8 @@ import java.time.LocalDateTime
         Index(columnList = "recipient_user_id, target_photo_id, group_closed_at"),
         Index(columnList = "group_closed_at, sent_at"),
         Index(columnList = "notif_id"),
+        Index(columnList = "recipient_user_id, sent_at"),
+        Index(columnList = "sent_at"),
     ],
 )
 class NotificationEntity(

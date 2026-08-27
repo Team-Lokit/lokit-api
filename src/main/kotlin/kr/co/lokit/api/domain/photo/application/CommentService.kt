@@ -6,13 +6,16 @@ import kr.co.lokit.api.common.exception.errorDetailsOf
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.EmoticonRepositoryPort
+import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.`in`.CommentUseCase
 import kr.co.lokit.api.domain.photo.application.port.`in`.EmoticonUseCase
 import kr.co.lokit.api.domain.photo.domain.Comment
 import kr.co.lokit.api.domain.photo.domain.CommentCreatedEvent
+import kr.co.lokit.api.domain.photo.domain.CommentListViewedEvent
 import kr.co.lokit.api.domain.photo.domain.CommentWithEmoticons
 import kr.co.lokit.api.domain.photo.domain.Emoticon
 import kr.co.lokit.api.domain.photo.domain.EmoticonAddedEvent
+import kr.co.lokit.api.domain.photo.domain.PhotoViewerRole
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -23,6 +26,7 @@ class CommentService(
     private val emoticonRepository: EmoticonRepositoryPort,
     private val coupleRepository: CoupleRepositoryPort,
     private val eventPublisher: ApplicationEventPublisher,
+    private val photoRepository: PhotoRepositoryPort,
 ) : CommentUseCase,
     EmoticonUseCase {
     @Transactional
@@ -45,8 +49,18 @@ class CommentService(
         currentUserId: Long,
     ): List<CommentWithEmoticons> {
         val comments = commentRepository.findAllByPhotoIdWithEmoticons(photoId, currentUserId)
-        val deIdentifyUserId = coupleRepository.findByUserId(currentUserId)?.deIdentifiedUserId()
-            ?: return comments
+        val couple = coupleRepository.findByUserId(currentUserId)
+        val photoOwnerId = photoRepository.findUploaderIdById(photoId)
+        eventPublisher.publishEvent(
+            CommentListViewedEvent(
+                photoId = photoId,
+                viewerUserId = currentUserId,
+                photoOwnerId = photoOwnerId,
+                viewerRole = PhotoViewerRole.of(photoOwnerId, currentUserId, couple),
+                commentCount = comments.size,
+            ),
+        )
+        val deIdentifyUserId = couple?.deIdentifiedUserId() ?: return comments
         return comments.map { if (it.comment.userId == deIdentifyUserId) it.deIdentified() else it }
     }
 

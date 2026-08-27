@@ -145,6 +145,20 @@ class NotificationTest {
         assertEquals("notification:group:1:10", Notification.groupWindowLockKey(1L, 10L))
     }
 
+    /**
+     * R1 / D5. 정리 기준 시각 계산은 도메인이 소유한다.
+     * 스케줄러와 어댑터가 각자 now 산술을 하면 두 시각이 어긋난다(§6 'now 산술 중복').
+     * closableWindowCutoff 와 같은 모양이며, 경계는 '<'(미포함)다 — 컷오프와 정확히
+     * 같은 sentAt 은 정리 대상이 아니다(R14 가 실 DB 에서 그 경계를 증명한다).
+     */
+    @Test
+    fun `보존 기간 컷오프는 30일 전이다`() {
+        val now = sentAt
+
+        assertEquals(30L, Notification.RETENTION_DAYS)
+        assertEquals(LocalDateTime.of(2025, 12, 2, 12, 0), Notification.retentionCutoff(now))
+    }
+
     private fun uploadNotification(
         notifId: String = "notif-upload-1",
         targetPhotoId: Long = 77L,

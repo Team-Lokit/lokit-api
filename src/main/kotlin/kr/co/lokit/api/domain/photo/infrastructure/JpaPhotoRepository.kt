@@ -108,4 +108,8 @@ class JpaPhotoRepository(
         if (ids.isEmpty()) return emptyList()
         return photoJpaRepository.findAllByIdsWithRelations(ids).map { it.toDomain() }
     }
+
+    @Transactional(readOnly = true)
+    override fun findUploaderIdById(id: Long): Long =
+        photoJpaRepository.findUploaderIdById(id) ?: throw entityNotFound<Photo>(id)
 }

@@ -44,6 +44,18 @@ class NotificationSettingsTest {
         assertTrue(updated.isTypeEnabled(NotificationType.UPLOAD))
     }
 
+    /** 커버리지 리뷰(슬라이스8)로 못박은 경로: 껐던 종류를 다시 켜면 disabledTypes에서 실제로 빠진다. */
+    @Test
+    fun `꺼져 있던 종류를 켜면 다시 활성화된다`() {
+        val allDisabled = settings(disabledTypes = setOf(NotificationType.COMMENT, NotificationType.REACTION))
+
+        val updated =
+            allDisabled.update(masterEnabled = null, typeToggles = mapOf(NotificationType.COMMENT to true))
+
+        assertTrue(updated.isTypeEnabled(NotificationType.COMMENT))
+        assertFalse(updated.isTypeEnabled(NotificationType.REACTION))
+    }
+
     @Test
     fun `마스터가 꺼지면 종류가 켜져 있어도 유효 발송은 거짓이다`() {
         val master = settings(masterEnabled = false)

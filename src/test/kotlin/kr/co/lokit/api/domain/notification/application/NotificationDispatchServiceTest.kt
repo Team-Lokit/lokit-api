@@ -276,6 +276,29 @@ class NotificationDispatchServiceTest {
         verify(pushSenderPort).send(any())
     }
 
+    /**
+     * 커버리지 리뷰(슬라이스8)로 못박은 경로: `UploadNotificationService`엔 이미 있던
+     * "행위자 조회 실패 시 기본 이름" 테스트가 마감 배치(closeGroupWindow) 쪽엔 없었다.
+     */
+    @Test
+    fun `마감 시 행위자 조회가 실패하면 기본 이름으로 통합 문구를 만든다`() {
+        val window = createNotification(id = 42L, actorUserId = ACTOR_ID, groupCount = 3)
+        whenever(userRepository.findById(ACTOR_ID)).thenReturn(null)
+        whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
+            createNotification(id = 42L, groupCount = 3, body = "상대방님이 댓글 3개를 남겼어요", groupClosedAt = NOW),
+        )
+        whenever(deviceTokenRepository.findAllByUserId(RECIPIENT_ID)).thenReturn(
+            listOf(createDeviceToken(id = 1L, userId = RECIPIENT_ID, token = "fcm-a")),
+        )
+        whenever(pushSenderPort.send(any())).thenReturn(PushSendResult(successTokens = listOf("fcm-a")))
+
+        service.closeGroupWindow(window, NOW)
+
+        val captor = argumentCaptor<String>()
+        verify(notificationRepository).closeGroupWindow(eq(42L), eq(NOW), captor.capture())
+        assertEquals("상대방님이 댓글 3개를 남겼어요", captor.firstValue)
+    }
+
     @Test
     fun `마감 시 그룹 개수가 1이면 마감 표시만 하고 발송하지 않는다`() {
         val window = createNotification(id = 42L, groupCount = 1, body = "상대방님이 댓글을 남겼어요")

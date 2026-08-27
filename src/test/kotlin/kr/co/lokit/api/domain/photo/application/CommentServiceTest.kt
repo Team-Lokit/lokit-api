@@ -5,10 +5,13 @@ import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.EmoticonRepositoryPort
+import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.photo.domain.CommentCreatedEvent
+import kr.co.lokit.api.domain.photo.domain.CommentListViewedEvent
 import kr.co.lokit.api.domain.photo.domain.CommentWithEmoticons
 import kr.co.lokit.api.domain.photo.domain.DeIdentifiedUserProfile
 import kr.co.lokit.api.domain.photo.domain.EmoticonAddedEvent
+import kr.co.lokit.api.domain.photo.domain.PhotoViewerRole
 import kr.co.lokit.api.fixture.createComment
 import kr.co.lokit.api.fixture.createCouple
 import kr.co.lokit.api.fixture.createEmoticon
@@ -25,6 +28,7 @@ import org.mockito.Mockito.verify
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.times
 import org.springframework.context.ApplicationEventPublisher
 
 @ExtendWith(MockitoExtension::class)
@@ -45,6 +49,9 @@ class CommentServiceTest {
      */
     @Mock
     lateinit var eventPublisher: ApplicationEventPublisher
+
+    @Mock
+    lateinit var photoRepository: PhotoRepositoryPort
 
     @InjectMocks
     lateinit var commentService: CommentService
@@ -246,5 +253,96 @@ class CommentServiceTest {
         assertEquals(1, result.size)
         assertEquals("파트너", result[0].userName)
         assertEquals("https://example.com/partner.jpg", result[0].userProfileImageUrl)
+    }
+
+    @Test
+    fun `댓글 목록을 조회하면 조회 이벤트가 발행된다`() {
+        val viewerUserId = 1L
+        val photoOwnerId = 2L
+        val photoId = 10L
+
+        `when`(commentRepository.findAllByPhotoIdWithEmoticons(photoId, viewerUserId)).thenReturn(emptyList())
+        `when`(coupleRepository.findByUserId(viewerUserId)).thenReturn(
+            createCouple(id = 1L, userIds = listOf(viewerUserId, photoOwnerId), status = CoupleStatus.CONNECTED),
+        )
+        `when`(photoRepository.findUploaderIdById(photoId)).thenReturn(photoOwnerId)
+
+        commentService.getComments(photoId, viewerUserId)
+
+        val captor = argumentCaptor<CommentListViewedEvent>()
+        verify(eventPublisher).publishEvent(captor.capture())
+        val event = captor.firstValue
+        assertEquals(photoId, event.photoId)
+        assertEquals(viewerUserId, event.viewerUserId)
+        assertEquals(photoOwnerId, event.photoOwnerId)
+        assertEquals(PhotoViewerRole.PARTNER, event.viewerRole)
+    }
+
+    @Test
+    fun `댓글 목록 조회 이벤트에 댓글 수가 담긴다`() {
+        val viewerUserId = 1L
+        val photoOwnerId = 2L
+        val photoId = 10L
+        val comments = listOf(
+            CommentWithEmoticons(
+                comment = createComment(id = 1L, userId = photoOwnerId, photoId = photoId),
+                userName = "업로더",
+                userProfileImageUrl = null,
+                emoticons = emptyList(),
+            ),
+            CommentWithEmoticons(
+                comment = createComment(id = 2L, userId = viewerUserId, photoId = photoId),
+                userName = "나",
+                userProfileImageUrl = null,
+                emoticons = emptyList(),
+            ),
+        )
+
+        `when`(commentRepository.findAllByPhotoIdWithEmoticons(photoId, viewerUserId)).thenReturn(comments)
+        `when`(coupleRepository.findByUserId(viewerUserId)).thenReturn(
+            createCouple(id = 1L, userIds = listOf(viewerUserId, photoOwnerId), status = CoupleStatus.CONNECTED),
+        )
+        `when`(photoRepository.findUploaderIdById(photoId)).thenReturn(photoOwnerId)
+
+        commentService.getComments(photoId, viewerUserId)
+
+        val captor = argumentCaptor<CommentListViewedEvent>()
+        verify(eventPublisher).publishEvent(captor.capture())
+        assertEquals(2, captor.firstValue.commentCount)
+    }
+
+    @Test
+    fun `커플이 없어도 댓글 조회 이벤트는 발행된다`() {
+        val viewerUserId = 1L
+        val photoOwnerId = 2L
+        val photoId = 10L
+
+        `when`(commentRepository.findAllByPhotoIdWithEmoticons(photoId, viewerUserId)).thenReturn(emptyList())
+        `when`(coupleRepository.findByUserId(viewerUserId)).thenReturn(null)
+        `when`(photoRepository.findUploaderIdById(photoId)).thenReturn(photoOwnerId)
+
+        commentService.getComments(photoId, viewerUserId)
+
+        val captor = argumentCaptor<CommentListViewedEvent>()
+        verify(eventPublisher).publishEvent(captor.capture())
+        assertEquals(PhotoViewerRole.OTHER, captor.firstValue.viewerRole)
+    }
+
+    @Test
+    fun `댓글 목록 조회는 업로더와 커플을 각각 한 번만 조회한다`() {
+        val viewerUserId = 1L
+        val photoOwnerId = 2L
+        val photoId = 10L
+
+        `when`(commentRepository.findAllByPhotoIdWithEmoticons(photoId, viewerUserId)).thenReturn(emptyList())
+        `when`(coupleRepository.findByUserId(viewerUserId)).thenReturn(
+            createCouple(id = 1L, userIds = listOf(viewerUserId, photoOwnerId), status = CoupleStatus.CONNECTED),
+        )
+        `when`(photoRepository.findUploaderIdById(photoId)).thenReturn(photoOwnerId)
+
+        commentService.getComments(photoId, viewerUserId)
+
+        verify(coupleRepository, times(1)).findByUserId(viewerUserId)
+        verify(photoRepository, times(1)).findUploaderIdById(photoId)
     }
 }

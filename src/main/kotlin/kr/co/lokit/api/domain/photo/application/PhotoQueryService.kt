@@ -9,6 +9,9 @@ import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.`in`.GetPhotoDetailUseCase
 import kr.co.lokit.api.domain.photo.domain.DeIdentifiedUserProfile
 import kr.co.lokit.api.domain.photo.domain.PhotoDetailReadModel
+import kr.co.lokit.api.domain.photo.domain.PhotoViewedEvent
+import kr.co.lokit.api.domain.photo.domain.PhotoViewerRole
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,6 +21,7 @@ class PhotoQueryService(
     private val albumRepository: AlbumRepositoryPort,
     private val mapClientPort: MapClientPort,
     private val coupleRepository: CoupleRepositoryPort,
+    private val eventPublisher: ApplicationEventPublisher,
 ) : GetPhotoDetailUseCase {
     @Transactional(readOnly = true)
     override fun getPhotosByAlbum(
@@ -38,11 +42,21 @@ class PhotoQueryService(
                 photoDetail.location.latitude,
             )
 
-        val deIdentifiedUserId = coupleRepository.findByUserId(userId)?.deIdentifiedUserId()
+        val couple = coupleRepository.findByUserId(userId)
+        val deIdentifiedUserId = couple?.deIdentifiedUserId()
         val shouldDeIdentify = deIdentifiedUserId == photoDetail.uploadedById
         val uploaderName = if (shouldDeIdentify) DeIdentifiedUserProfile.DISPLAY_NAME else photoDetail.uploaderName
         val uploaderProfileImageUrl =
             if (shouldDeIdentify) DeIdentifiedUserProfile.hiddenProfileImageUrl() else photoDetail.uploaderProfileImageUrl
+
+        eventPublisher.publishEvent(
+            PhotoViewedEvent(
+                photoId = photoDetail.id,
+                viewerUserId = userId,
+                photoOwnerId = photoDetail.uploadedById,
+                viewerRole = PhotoViewerRole.of(photoDetail.uploadedById, userId, couple),
+            ),
+        )
 
         return PhotoDetailReadModel(
             id = photoDetail.id,

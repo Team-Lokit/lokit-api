@@ -57,12 +57,18 @@ data class Notification(
         const val NOTIF_ID_LENGTH: Int = 36
         const val MIN_GROUP_COUNT: Int = 1
         const val TARGET_ADDRESS_LENGTH: Int = 255
+
+        /** 알림함 보존 기간. 이보다 오래된 알림은 정리 배치가 소프트삭제한다. */
+        const val RETENTION_DAYS: Long = 30
         private const val GROUP_WINDOW_LOCK_PREFIX = "notification:group:"
 
         fun groupWindowLockKey(recipientUserId: Long, targetPhotoId: Long): String =
             "$GROUP_WINDOW_LOCK_PREFIX$recipientUserId:$targetPhotoId"
 
         fun closableWindowCutoff(now: LocalDateTime): LocalDateTime = now.minusMinutes(GROUP_WINDOW_MINUTES)
+
+        /** 이 시각 '이전'(<, 경계 미포함)에 발송된 알림이 정리 대상이다. closableWindowCutoff 와 같은 모양. */
+        fun retentionCutoff(now: LocalDateTime): LocalDateTime = now.minusDays(RETENTION_DAYS)
 
         /**
          * 업로드 알림 팩터리. groupClosedAt을 sentAt으로 항상 채운다.

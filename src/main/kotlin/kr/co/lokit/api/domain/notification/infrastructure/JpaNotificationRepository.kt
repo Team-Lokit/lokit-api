@@ -32,6 +32,7 @@ class JpaNotificationRepository(
             ),
         ).toDomain()
 
+    @Transactional(readOnly = true)
     override fun findLatestUnclosedByRecipientAndPhoto(recipientUserId: Long, targetPhotoId: Long): Notification? =
         notificationJpaRepository.findFirstByRecipientUserIdAndTargetPhotoIdAndGroupClosedAtIsNullOrderBySentAtDesc(
             recipientUserId,
@@ -48,6 +49,7 @@ class JpaNotificationRepository(
     }
 
     /** 정렬은 파생 쿼리 이름의 OrderBySentAtAsc가 담당한다 — PageRequest에 Sort를 얹지 않는다(B16). */
+    @Transactional(readOnly = true)
     override fun findClosableGroupWindows(sentAtBefore: LocalDateTime, limit: Int): List<Notification> =
         notificationJpaRepository.findAllByGroupClosedAtIsNullAndSentAtLessThanEqualOrderBySentAtAsc(
             sentAtBefore,
@@ -62,6 +64,40 @@ class JpaNotificationRepository(
         entity.groupClosedAt = closedAt
         entity.body = body
         return entity.toDomain()
+    }
+
+    /** 정렬은 파생 쿼리 이름이 담당한다 — PageRequest에 Sort를 얹지 않는다(B16). */
+    @Transactional(readOnly = true)
+    override fun findInboxPage(recipientUserId: Long, page: Int, size: Int): List<Notification> =
+        notificationJpaRepository
+            .findAllByRecipientUserIdOrderBySentAtDescIdDesc(recipientUserId, PageRequest.of(page, size))
+            .map { it.toDomain() }
+
+    @Transactional(readOnly = true)
+    override fun countInbox(recipientUserId: Long): Long =
+        notificationJpaRepository.countByRecipientUserId(recipientUserId)
+
+    @Transactional(readOnly = true)
+    override fun findByNotifId(notifId: String): Notification? =
+        notificationJpaRepository.findByNotifId(notifId)?.toDomain()
+
+    /** 더티체킹 — save를 부르지 않는다(계약 2-8). */
+    @Transactional
+    override fun markAsRead(notificationId: Long): Notification {
+        val entity = notificationJpaRepository.findByIdOrNull(notificationId)
+            ?: throw entityNotFound<Notification>(notificationId)
+        entity.isRead = true
+        return entity.toDomain()
+    }
+
+    /** deleteAll(entities)를 쓴다 — @SoftDelete가 DELETE를 is_deleted=true UPDATE로 바꾼다. */
+    @Transactional
+    override fun deleteSentBefore(sentAtBefore: LocalDateTime, limit: Int): Int {
+        val targets = notificationJpaRepository
+            .findAllBySentAtBeforeOrderBySentAtAsc(sentAtBefore, PageRequest.of(0, limit))
+        if (targets.isEmpty()) return 0
+        notificationJpaRepository.deleteAll(targets)
+        return targets.size
     }
 
     private fun NotificationEntity.toDomain(): Notification =

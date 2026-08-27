@@ -27,4 +27,7 @@ interface PhotoRepositoryPort {
 
     /** D6: 없거나 소프트삭제된 id는 예외 없이 결과에서 빠진다. 빈 입력이면 DB를 조회하지 않는다. 순서 미보장. */
     fun findAllByIds(ids: List<Long>): List<Photo>
+
+    /** 업로더 id 만 읽는 스칼라 프로젝션. 없는 사진이면 findById 와 동일하게 예외를 던진다. */
+    fun findUploaderIdById(id: Long): Long
 }
