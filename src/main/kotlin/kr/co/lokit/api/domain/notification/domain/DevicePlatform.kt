@@ -8,4 +8,5 @@ package kr.co.lokit.api.domain.notification.domain
 enum class DevicePlatform {
     ANDROID,
     IOS,
+    WEB,
 }
