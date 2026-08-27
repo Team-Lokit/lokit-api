@@ -107,6 +107,14 @@ apple:
     redirect-uri: ${APPLE_REDIRECT_URI}
     front-redirect-uri: ${APPLE_FRONT_REDIRECT_URI}
 
+# credentials-location은 file: 접두사 필수 — DefaultResourceLoader가 스킴 없으면 classpath로 오인한다.
+notification:
+    push:
+        enabled: ${NOTIFICATION_PUSH_ENABLED:false}
+        fcm:
+            project-id: ${NOTIFICATION_PUSH_FCM_PROJECT_ID:}
+            credentials-location: ${NOTIFICATION_PUSH_FCM_CREDENTIALS_LOCATION:}
+
 cookie:
     secure: true
     domain: ${COOKIE_DOMAIN:}

@@ -141,8 +141,23 @@ class NotificationTest {
     }
 
     @Test
-    fun `그룹 윈도우 락 키는 수신자와 사진으로 만들어진다`() {
-        assertEquals("notification:group:1:10", Notification.groupWindowLockKey(1L, 10L))
+    fun `그룹 윈도우 락 키는 수신자와 사진과 타입으로 만들어진다`() {
+        assertEquals(
+            "notification:group:1:10:COMMENT",
+            Notification.groupWindowLockKey(1L, 10L, NotificationType.COMMENT),
+        )
+    }
+
+    /**
+     * 버그3 픽스: 같은 수신자·사진이어도 타입이 다르면 다른 락 키다.
+     * 이게 같으면 댓글 윈도우가 열려 있을 때 반응이 같은 윈도우로 합쳐진다(그룹 카운트 오염).
+     */
+    @Test
+    fun `그룹 윈도우 락 키는 타입이 다르면 서로 다르다`() {
+        val commentKey = Notification.groupWindowLockKey(1L, 10L, NotificationType.COMMENT)
+        val reactionKey = Notification.groupWindowLockKey(1L, 10L, NotificationType.REACTION)
+
+        assertFalse(commentKey == reactionKey)
     }
 
     /**

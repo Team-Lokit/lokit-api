@@ -1,5 +1,6 @@
 package kr.co.lokit.api.domain.notification.infrastructure
 
+import kr.co.lokit.api.domain.notification.domain.NotificationType
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import java.time.LocalDateTime
@@ -9,9 +10,11 @@ import java.time.LocalDateTime
  * Hibernate가 is_deleted=false 조건을 자동으로 추가한다.
  */
 interface NotificationJpaRepository : JpaRepository<NotificationEntity, Long> {
-    fun findFirstByRecipientUserIdAndTargetPhotoIdAndGroupClosedAtIsNullOrderBySentAtDesc(
+    /** NotificationType 조건이 빠지면 댓글/반응 그룹 윈도우가 사진 단위로 섞인다(버그3). */
+    fun findFirstByRecipientUserIdAndTargetPhotoIdAndNotificationTypeAndGroupClosedAtIsNullOrderBySentAtDesc(
         recipientUserId: Long,
         targetPhotoId: Long,
+        notificationType: NotificationType,
     ): NotificationEntity?
 
     fun findAllByGroupClosedAtIsNullAndSentAtLessThanEqualOrderBySentAtAsc(

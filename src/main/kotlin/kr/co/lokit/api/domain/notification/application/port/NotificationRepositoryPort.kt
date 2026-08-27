@@ -1,14 +1,23 @@
 package kr.co.lokit.api.domain.notification.application.port
 
 import kr.co.lokit.api.domain.notification.domain.Notification
+import kr.co.lokit.api.domain.notification.domain.NotificationType
 import java.time.LocalDateTime
 
 /** 포트는 '5분' 정책을 모른다(D2). 열림 판정은 Notification.isGroupWindowOpen이 한다. */
 interface NotificationRepositoryPort {
     fun save(notification: Notification): Notification
 
-    /** group_closed_at is null인 것 중 sent_at이 가장 최근인 1건. 열림 판정은 호출자 몫. */
-    fun findLatestUnclosedByRecipientAndPhoto(recipientUserId: Long, targetPhotoId: Long): Notification?
+    /**
+     * group_closed_at is null이고 notification_type이 일치하는 것 중 sent_at이 가장 최근인 1건.
+     * 열림 판정은 호출자 몫. 타입까지 걸러야 한다 — 안 그러면 댓글 윈도우가 열려 있을 때 반응이
+     * 그 윈도우로 합쳐진다(버그3, 화면 기획 대조로 발견).
+     */
+    fun findLatestUnclosedByRecipientAndPhoto(
+        recipientUserId: Long,
+        targetPhotoId: Long,
+        notificationType: NotificationType,
+    ): Notification?
 
     /** group_count += 1 (더티체킹). 대상 없으면 entityNotFound. */
     fun increaseGroupCount(notificationId: Long): Notification

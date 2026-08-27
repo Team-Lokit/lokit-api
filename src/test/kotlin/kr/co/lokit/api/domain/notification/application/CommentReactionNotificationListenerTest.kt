@@ -47,12 +47,14 @@ class CommentReactionNotificationListenerTest {
             actorUserId = eq(ACTOR_ID),
             targetPhotoId = eq(PHOTO_ID),
             notificationType = eq(NotificationType.COMMENT),
+            emoji = eq(null),
             now = any(),
         )
     }
 
+    /** 버그2 픽스: 이모지 추가 이벤트가 담고 있던 emoji 값이 그대로 dispatch 서비스까지 전달된다. */
     @Test
-    fun `이모지 추가 이벤트를 받으면 REACTION 알림을 요청한다`() {
+    fun `이모지 추가 이벤트를 받으면 REACTION 알림을 요청하고 이모지를 그대로 전달한다`() {
         whenever(photoRepository.findById(PHOTO_ID))
             .thenReturn(createPhoto(id = PHOTO_ID, uploadedById = OWNER_ID))
 
@@ -71,6 +73,7 @@ class CommentReactionNotificationListenerTest {
             actorUserId = eq(ACTOR_ID),
             targetPhotoId = eq(PHOTO_ID),
             notificationType = eq(NotificationType.REACTION),
+            emoji = eq("❤️"),
             now = any(),
         )
     }
@@ -85,7 +88,7 @@ class CommentReactionNotificationListenerTest {
         )
 
         verify(notificationDispatchService, never())
-            .notifyPhotoInteraction(any(), any(), any(), any(), any())
+            .notifyPhotoInteraction(any(), any(), any(), any(), any(), any())
     }
 
     @Test
@@ -104,7 +107,7 @@ class CommentReactionNotificationListenerTest {
         )
 
         verify(notificationDispatchService, never())
-            .notifyPhotoInteraction(any(), any(), any(), any(), any())
+            .notifyPhotoInteraction(any(), any(), any(), any(), any(), any())
     }
 
     @Test
@@ -119,7 +122,7 @@ class CommentReactionNotificationListenerTest {
         }
 
         verify(notificationDispatchService, never())
-            .notifyPhotoInteraction(any(), any(), any(), any(), any())
+            .notifyPhotoInteraction(any(), any(), any(), any(), any(), any())
     }
 
     companion object {

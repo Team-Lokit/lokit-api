@@ -26,13 +26,14 @@ class CommentReactionNotificationListener(
     @Async
     @TransactionalEventListener
     fun handleEmoticonAdded(event: EmoticonAddedEvent) {
-        notify(event.photoId, event.actorUserId, NotificationType.REACTION)
+        notify(event.photoId, event.actorUserId, NotificationType.REACTION, event.emoji)
     }
 
     private fun notify(
         photoId: Long,
         actorUserId: Long,
         notificationType: NotificationType,
+        emoji: String? = null,
     ) {
         try {
             val recipientUserId = photoRepository.findById(photoId).uploadedById
@@ -42,6 +43,7 @@ class CommentReactionNotificationListener(
                 actorUserId = actorUserId,
                 targetPhotoId = photoId,
                 notificationType = notificationType,
+                emoji = emoji,
             )
         } catch (e: Exception) {
             log.warn("알림 생성 실패 (사용자 요청에는 영향 없음): photoId={}, type={}", photoId, notificationType, e)

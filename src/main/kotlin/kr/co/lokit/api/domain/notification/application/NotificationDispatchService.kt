@@ -35,28 +35,33 @@ class NotificationDispatchService(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /** 열린 윈도우 있으면 count만 증가하고 null 반환(푸시 없음). 없으면 신규 저장+즉시발송 후 반환. */
+    /**
+     * 열린 윈도우 있으면 count만 증가하고 null 반환(푸시 없음). 없으면 신규 저장+즉시발송 후 반환.
+     * emoji는 REACTION 신규 생성 시 본문에만 쓰인다(그룹 합류 시엔 무시 — 그룹 요약은 이모지를
+     * 보여주지 않는다). 락 키·조회 모두 notificationType으로 걸러 댓글/반응이 서로 섞이지 않는다(버그3).
+     */
     fun notifyPhotoInteraction(
         recipientUserId: Long,
         actorUserId: Long,
         targetPhotoId: Long,
         notificationType: NotificationType,
+        emoji: String? = null,
         now: LocalDateTime = LocalDateTime.now(),
     ): Notification? {
         val created =
             lockManager.withLock(
-                key = Notification.groupWindowLockKey(recipientUserId, targetPhotoId),
+                key = Notification.groupWindowLockKey(recipientUserId, targetPhotoId, notificationType),
                 operation = {
                     val openWindow =
                         notificationRepository
-                            .findLatestUnclosedByRecipientAndPhoto(recipientUserId, targetPhotoId)
+                            .findLatestUnclosedByRecipientAndPhoto(recipientUserId, targetPhotoId, notificationType)
                             ?.takeIf { it.isGroupWindowOpen(now) }
                     if (openWindow != null) {
                         notificationRepository.increaseGroupCount(openWindow.id)
                         null
                     } else {
                         notificationRepository.save(
-                            newNotification(recipientUserId, actorUserId, targetPhotoId, notificationType, now),
+                            newNotification(recipientUserId, actorUserId, targetPhotoId, notificationType, emoji, now),
                         )
                     }
                 },
@@ -99,6 +104,7 @@ class NotificationDispatchService(
         actorUserId: Long,
         targetPhotoId: Long,
         notificationType: NotificationType,
+        emoji: String?,
         now: LocalDateTime,
     ): Notification =
         Notification(
@@ -114,6 +120,7 @@ class NotificationDispatchService(
                     resolveActorName(actorUserId),
                     notificationType,
                     Notification.MIN_GROUP_COUNT,
+                    emoji,
                 ),
             sentAt = now,
         )

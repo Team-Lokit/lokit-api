@@ -62,8 +62,9 @@ data class Notification(
         const val RETENTION_DAYS: Long = 30
         private const val GROUP_WINDOW_LOCK_PREFIX = "notification:group:"
 
-        fun groupWindowLockKey(recipientUserId: Long, targetPhotoId: Long): String =
-            "$GROUP_WINDOW_LOCK_PREFIX$recipientUserId:$targetPhotoId"
+        /** 타입까지 키에 넣는다 — 그렇지 않으면 댓글 윈도우가 열려 있을 때 반응이 거기 합쳐진다(버그3). */
+        fun groupWindowLockKey(recipientUserId: Long, targetPhotoId: Long, notificationType: NotificationType): String =
+            "$GROUP_WINDOW_LOCK_PREFIX$recipientUserId:$targetPhotoId:${notificationType.name}"
 
         fun closableWindowCutoff(now: LocalDateTime): LocalDateTime = now.minusMinutes(GROUP_WINDOW_MINUTES)
 
@@ -72,7 +73,9 @@ data class Notification(
 
         /**
          * 업로드 알림 팩터리. groupClosedAt을 sentAt으로 항상 채운다.
-         * null로 두면 마감 배치가 5분 뒤 이 알림을 집어 본문을 "댓글 N개"로 덮어쓰고 2차 푸시를 보낸다.
+         * null로 두면 마감 배치가 5분 뒤 이 알림을 집어 본문을 NotificationMessage.body()의 그룹
+         * 요약 문구로 덮어쓰고 2차 푸시를 보낸다 — uploadBody()가 만든 "장소 O에 사진 N장을
+         * 올렸어요" 같은 본문을 잃게 되므로 반드시 sentAt으로 채워 마감 배치 대상에서 제외한다.
          */
         fun upload(
             notifId: String,

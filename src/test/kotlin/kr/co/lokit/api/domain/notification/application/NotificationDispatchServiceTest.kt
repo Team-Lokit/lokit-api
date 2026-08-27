@@ -80,7 +80,7 @@ class NotificationDispatchServiceTest {
 
     @Test
     fun `열린 윈도우가 없으면 알림을 새로 저장한다`() {
-        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(null)
         whenever(userRepository.findById(ACTOR_ID)).thenReturn(createUser(id = ACTOR_ID, name = "지민"))
         whenever(notificationRepository.save(any())).thenReturn(createNotification())
@@ -108,7 +108,7 @@ class NotificationDispatchServiceTest {
 
     @Test
     fun `열린 윈도우가 없으면 즉시 푸시 1건을 보낸다`() {
-        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(null)
         whenever(notificationRepository.save(any())).thenReturn(
             createNotification(notifId = "notif-9", title = "새 댓글", body = "지민님이 댓글을 남겼어요"),
@@ -144,7 +144,7 @@ class NotificationDispatchServiceTest {
     @Test
     fun `열린 윈도우가 있으면 그룹 개수만 올리고 푸시를 보내지 않는다`() {
         val openWindow = createNotification(id = 42L, sentAt = NOW, groupClosedAt = null)
-        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(openWindow)
 
         service.notifyPhotoInteraction(
@@ -163,7 +163,7 @@ class NotificationDispatchServiceTest {
     @Test
     fun `창이 만료된 알림만 남아 있으면 새 윈도우를 연다`() {
         val expiredWindow = createNotification(id = 42L, sentAt = NOW.minusMinutes(6), groupClosedAt = null)
-        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(expiredWindow)
         whenever(notificationRepository.save(any())).thenReturn(createNotification())
 
@@ -179,9 +179,59 @@ class NotificationDispatchServiceTest {
         verify(notificationRepository, never()).increaseGroupCount(any())
     }
 
+    /**
+     * 버그3 픽스: 같은 사진에 댓글 윈도우가 열려 있어도 반응은 그 윈도우에 합쳐지지 않고
+     * 자기만의 새 윈도우를 연다. 합쳐지면 반응 카운트가 댓글 카운트에 섞이고(버그1과 겹치면
+     * "댓글 N개"로 잘못 표시된다) — findLatestUnclosedByRecipientAndPhoto 를 타입별로 조회해야 한다.
+     */
+    @Test
+    fun `댓글 윈도우가 열려 있어도 반응은 별도의 새 윈도우를 연다`() {
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.REACTION))
+            .thenReturn(null)
+        whenever(userRepository.findById(ACTOR_ID)).thenReturn(createUser(id = ACTOR_ID, name = "지민"))
+        whenever(notificationRepository.save(any())).thenReturn(
+            createNotification(notificationType = NotificationType.REACTION),
+        )
+
+        service.notifyPhotoInteraction(
+            recipientUserId = RECIPIENT_ID,
+            actorUserId = ACTOR_ID,
+            targetPhotoId = PHOTO_ID,
+            notificationType = NotificationType.REACTION,
+            now = NOW,
+        )
+
+        verify(notificationRepository).save(any())
+        verify(notificationRepository, never()).increaseGroupCount(any())
+    }
+
+    /**
+     * 버그2 픽스: 반응 알림을 새로 만들 때 실제로 남긴 이모지가 본문에 담긴다.
+     */
+    @Test
+    fun `반응 알림을 새로 만들면 이모지가 본문에 담긴다`() {
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.REACTION))
+            .thenReturn(null)
+        whenever(userRepository.findById(ACTOR_ID)).thenReturn(createUser(id = ACTOR_ID, name = "지민"))
+        whenever(notificationRepository.save(any())).thenReturn(createNotification())
+
+        service.notifyPhotoInteraction(
+            recipientUserId = RECIPIENT_ID,
+            actorUserId = ACTOR_ID,
+            targetPhotoId = PHOTO_ID,
+            notificationType = NotificationType.REACTION,
+            emoji = "❤️",
+            now = NOW,
+        )
+
+        val captor = argumentCaptor<Notification>()
+        verify(notificationRepository).save(captor.capture())
+        assertEquals("지민님이 ❤️ 반응을 남겼어요", captor.firstValue.body)
+    }
+
     @Test
     fun `푸시를 보내면 push_send 이벤트에 알림 식별자와 종류와 그룹 개수가 기록된다`() {
-        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(null)
         whenever(notificationRepository.save(any())).thenReturn(createNotification(notifId = "notif-9"))
         whenever(deviceTokenRepository.findAllByUserId(RECIPIENT_ID)).thenReturn(
@@ -221,7 +271,7 @@ class NotificationDispatchServiceTest {
     @Test
     fun `푸시 발송기가 없으면 알림은 저장되지만 발송과 로깅은 생략된다`() {
         val serviceWithoutSender = newService(null)
-        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(null)
         whenever(notificationRepository.save(any())).thenReturn(createNotification())
 
@@ -240,7 +290,7 @@ class NotificationDispatchServiceTest {
 
     @Test
     fun `등록된 디바이스 토큰이 없으면 발송하지 않는다`() {
-        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(null)
         whenever(notificationRepository.save(any())).thenReturn(createNotification())
         whenever(deviceTokenRepository.findAllByUserId(RECIPIENT_ID)).thenReturn(emptyList())
@@ -274,6 +324,36 @@ class NotificationDispatchServiceTest {
         verify(notificationRepository).closeGroupWindow(eq(42L), eq(NOW), captor.capture())
         assertEquals("지민님이 댓글 3개를 남겼어요", captor.firstValue)
         verify(pushSenderPort).send(any())
+    }
+
+    /**
+     * 버그1 픽스: 반응이 그룹으로 쌓여 마감되면 본문은 "반응 N개"여야 한다("댓글 N개" 아님).
+     * 버그3 픽스(타입별 윈도우 분리) 덕분에 이 시점의 notification.notificationType 은
+     * REACTION 으로 순수하게 보장된다 — 댓글과 섞여 들어올 수 없다.
+     */
+    @Test
+    fun `마감 시 그룹 개수가 2 이상인 반응은 반응 문구로 본문을 갱신한다`() {
+        val window = createNotification(id = 42L, actorUserId = ACTOR_ID, notificationType = NotificationType.REACTION, groupCount = 3)
+        whenever(userRepository.findById(ACTOR_ID)).thenReturn(createUser(id = ACTOR_ID, name = "지민"))
+        whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
+            createNotification(
+                id = 42L,
+                notificationType = NotificationType.REACTION,
+                groupCount = 3,
+                body = "지민님이 반응 3개를 남겼어요",
+                groupClosedAt = NOW,
+            ),
+        )
+        whenever(deviceTokenRepository.findAllByUserId(RECIPIENT_ID)).thenReturn(
+            listOf(createDeviceToken(id = 1L, userId = RECIPIENT_ID, token = "fcm-a")),
+        )
+        whenever(pushSenderPort.send(any())).thenReturn(PushSendResult(successTokens = listOf("fcm-a")))
+
+        service.closeGroupWindow(window, NOW)
+
+        val captor = argumentCaptor<String>()
+        verify(notificationRepository).closeGroupWindow(eq(42L), eq(NOW), captor.capture())
+        assertEquals("지민님이 반응 3개를 남겼어요", captor.firstValue)
     }
 
     /**
@@ -488,7 +568,7 @@ class NotificationDispatchServiceTest {
     }
 
     private fun givenNewWindow(saved: Notification = createNotification()) {
-        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID))
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(null)
         whenever(notificationRepository.save(any())).thenReturn(saved)
     }

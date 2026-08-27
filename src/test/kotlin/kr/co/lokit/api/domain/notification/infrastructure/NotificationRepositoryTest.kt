@@ -3,6 +3,7 @@ package kr.co.lokit.api.domain.notification.infrastructure
 import jakarta.persistence.EntityManager
 import kr.co.lokit.api.domain.notification.application.port.NotificationRepositoryPort
 import kr.co.lokit.api.domain.notification.domain.Notification
+import kr.co.lokit.api.domain.notification.domain.NotificationType
 import kr.co.lokit.api.fixture.createNotification
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -80,9 +81,32 @@ class NotificationRepositoryTest {
         )
         flushAndClear()
 
-        val found = repository.findLatestUnclosedByRecipientAndPhoto(1L, 10L)
+        val found = repository.findLatestUnclosedByRecipientAndPhoto(1L, 10L, NotificationType.COMMENT)
 
         assertEquals("open", found?.notifId)
+    }
+
+    /**
+     * 버그3 픽스 실 DB 검증: 같은 수신자·사진이어도 타입이 다른 열린 윈도우는 찾지 않는다.
+     * 파생 쿼리에 NotificationType 조건이 실제로 걸려 있는지는 목으로 검증 불가 — DataJpaTest 몫.
+     */
+    @Test
+    fun `같은 사진에 대한 다른 타입의 열린 윈도우는 찾지 않는다`() {
+        repository.save(
+            createNotification(
+                notifId = "comment-open",
+                recipientUserId = 1L,
+                targetPhotoId = 10L,
+                notificationType = NotificationType.COMMENT,
+                sentAt = now,
+                groupClosedAt = null,
+            ),
+        )
+        flushAndClear()
+
+        val found = repository.findLatestUnclosedByRecipientAndPhoto(1L, 10L, NotificationType.REACTION)
+
+        assertNull(found)
     }
 
     /**

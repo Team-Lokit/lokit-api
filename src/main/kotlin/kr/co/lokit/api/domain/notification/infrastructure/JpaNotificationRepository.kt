@@ -3,6 +3,7 @@ package kr.co.lokit.api.domain.notification.infrastructure
 import kr.co.lokit.api.common.exception.entityNotFound
 import kr.co.lokit.api.domain.notification.application.port.NotificationRepositoryPort
 import kr.co.lokit.api.domain.notification.domain.Notification
+import kr.co.lokit.api.domain.notification.domain.NotificationType
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Repository
@@ -33,11 +34,17 @@ class JpaNotificationRepository(
         ).toDomain()
 
     @Transactional(readOnly = true)
-    override fun findLatestUnclosedByRecipientAndPhoto(recipientUserId: Long, targetPhotoId: Long): Notification? =
-        notificationJpaRepository.findFirstByRecipientUserIdAndTargetPhotoIdAndGroupClosedAtIsNullOrderBySentAtDesc(
-            recipientUserId,
-            targetPhotoId,
-        )?.toDomain()
+    override fun findLatestUnclosedByRecipientAndPhoto(
+        recipientUserId: Long,
+        targetPhotoId: Long,
+        notificationType: NotificationType,
+    ): Notification? =
+        notificationJpaRepository
+            .findFirstByRecipientUserIdAndTargetPhotoIdAndNotificationTypeAndGroupClosedAtIsNullOrderBySentAtDesc(
+                recipientUserId,
+                targetPhotoId,
+                notificationType,
+            )?.toDomain()
 
     /** 더티체킹 — save를 부르지 않는다(계약 2-8). */
     @Transactional

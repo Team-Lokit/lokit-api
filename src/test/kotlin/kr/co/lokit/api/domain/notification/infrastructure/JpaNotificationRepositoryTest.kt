@@ -80,10 +80,14 @@ class JpaNotificationRepositoryTest {
     fun `마감되지 않은 가장 최근 알림을 조회한다`() {
         whenever(
             notificationJpaRepository
-                .findFirstByRecipientUserIdAndTargetPhotoIdAndGroupClosedAtIsNullOrderBySentAtDesc(7L, 99L),
+                .findFirstByRecipientUserIdAndTargetPhotoIdAndNotificationTypeAndGroupClosedAtIsNullOrderBySentAtDesc(
+                    7L,
+                    99L,
+                    NotificationType.COMMENT,
+                ),
         ).thenReturn(entity(notifId = "notif-42", recipientUserId = 7L, targetPhotoId = 99L, groupCount = 2))
 
-        val found = repository.findLatestUnclosedByRecipientAndPhoto(7L, 99L)
+        val found = repository.findLatestUnclosedByRecipientAndPhoto(7L, 99L, NotificationType.COMMENT)
 
         assertEquals("notif-42", found?.notifId)
         assertEquals(7L, found?.recipientUserId)
@@ -96,10 +100,14 @@ class JpaNotificationRepositoryTest {
     fun `마감되지 않은 알림이 없으면 널을 반환한다`() {
         whenever(
             notificationJpaRepository
-                .findFirstByRecipientUserIdAndTargetPhotoIdAndGroupClosedAtIsNullOrderBySentAtDesc(7L, 99L),
+                .findFirstByRecipientUserIdAndTargetPhotoIdAndNotificationTypeAndGroupClosedAtIsNullOrderBySentAtDesc(
+                    7L,
+                    99L,
+                    NotificationType.COMMENT,
+                ),
         ).thenReturn(null)
 
-        assertNull(repository.findLatestUnclosedByRecipientAndPhoto(7L, 99L))
+        assertNull(repository.findLatestUnclosedByRecipientAndPhoto(7L, 99L, NotificationType.COMMENT))
     }
 
     @Test
