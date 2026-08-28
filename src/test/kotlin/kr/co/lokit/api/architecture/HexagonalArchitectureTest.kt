@@ -67,4 +67,18 @@ class HexagonalArchitectureTest {
             .haveSimpleNameEndingWith("Entity")
             .check(classes)
     }
+
+    @Test
+    fun `common analytics application 계층은 infrastructure 구현이나 엔티티에 의존하면 안 된다`() {
+        noClasses()
+            .that()
+            .resideInAPackage("..common.analytics.application..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("..common.analytics.infrastructure..")
+            .orShould()
+            .dependOnClassesThat()
+            .haveSimpleNameEndingWith("Entity")
+            .check(classes)
+    }
 }

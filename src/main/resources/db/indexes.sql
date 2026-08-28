@@ -20,3 +20,17 @@ CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS unique_user_email_is_deleted ON u
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_couple_user_one_active_per_user ON couple_user (user_id) WHERE is_deleted = false;
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_invite_code_code_active ON invite_code (code) WHERE is_deleted = false;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_invite_code_creator_status_expires ON invite_code (created_by, status, expires_at) WHERE is_deleted = false;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_recipient_sent_at ON notification (recipient_user_id, sent_at DESC, id DESC) WHERE is_deleted = false;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_sent_at ON notification (sent_at) WHERE is_deleted = false;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_app_event_log_event_name ON app_event_log (event_name);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_app_event_log_user_id ON app_event_log (user_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_app_event_log_created_at ON app_event_log (created_at);
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_device_token_token_idx ON device_token (token);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_device_token_user_id ON device_token (user_id);
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_notification_setting_user_id_idx ON notification_setting (user_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pending_upload_couple_actor_sent ON pending_upload_notification (couple_id, actor_user_id, sent_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pending_upload_sent_scheduled ON pending_upload_notification (sent_at, scheduled_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pending_upload_couple_sent ON pending_upload_notification (couple_id, sent_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_recipient_photo_closed ON notification (recipient_user_id, target_photo_id, group_closed_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_closed_sent ON notification (group_closed_at, sent_at);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_notif_id ON notification (notif_id);

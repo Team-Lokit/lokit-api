@@ -27,9 +27,11 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.Mockito.doNothing
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.argumentCaptor
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
 import org.springframework.context.ApplicationEventPublisher
@@ -86,6 +88,81 @@ class PhotoCommandServiceTest {
 
         assertEquals(1L, result.id)
         verify(eventPublisher).publishEvent(any(PhotoCreatedEvent::class.java))
+    }
+
+    @Test
+    fun `사진을 생성하면 발행된 이벤트의 photoId가 저장된 사진의 id다`() {
+        // 입력 사진의 id는 0L, 저장된 사진의 id는 42L 로 명확히 구분한다(F3).
+        // 저장 전 객체(effectivePhoto)를 실으면 photoId 가 0L 이 되어 알림이 영원히 안 나간다.
+        val photo = createPhoto(albumId = 1L, location = createLocation(127.0, 37.5))
+        val savedPhoto =
+            createPhoto(
+                id = 42L,
+                albumId = 1L,
+                coupleId = 1L,
+                location = createLocation(127.0, 37.5),
+            )
+        doNothing().`when`(photoStoragePort).verifyFileExists(photo.url)
+        doNothing().`when`(currentCoupleAlbumResolver).validateAlbumBelongsToCurrentCouple(1L, 1L, ErrorField.UPLOADED_BY_ID)
+        `when`(mapQueryService.getLocationInfo(anyDouble(), anyDouble())).thenReturn(
+            LocationInfoReadModel(address = "서울 강남구", placeName = null, regionName = "강남구"),
+        )
+        `when`(photoRepository.save(anyObject())).thenReturn(savedPhoto)
+
+        photoCommandService.create(photo)
+
+        val captor = argumentCaptor<PhotoCreatedEvent>()
+        verify(eventPublisher).publishEvent(captor.capture())
+        assertEquals(42L, captor.firstValue.photoId)
+    }
+
+    @Test
+    fun `사진을 생성하면 발행된 이벤트의 uploaderUserId가 업로더 id다`() {
+        // 입력 사진의 uploadedById(1L)와 저장된 사진의 uploadedById(7L)를 다르게 둔다.
+        // 같은 값이면 이벤트가 saved 에서 왔는지 effectivePhoto 에서 왔는지 구분할 수 없다(B2).
+        val photo = createPhoto(albumId = 1L, uploadedById = 1L, location = createLocation(127.0, 37.5))
+        val savedPhoto =
+            createPhoto(
+                id = 42L,
+                albumId = 1L,
+                coupleId = 1L,
+                uploadedById = 7L,
+                location = createLocation(127.0, 37.5),
+            )
+        doNothing().`when`(photoStoragePort).verifyFileExists(photo.url)
+        doNothing().`when`(currentCoupleAlbumResolver).validateAlbumBelongsToCurrentCouple(1L, 1L, ErrorField.UPLOADED_BY_ID)
+        `when`(mapQueryService.getLocationInfo(anyDouble(), anyDouble())).thenReturn(
+            LocationInfoReadModel(address = "서울 강남구", placeName = null, regionName = "강남구"),
+        )
+        `when`(photoRepository.save(anyObject())).thenReturn(savedPhoto)
+
+        photoCommandService.create(photo)
+
+        val captor = argumentCaptor<PhotoCreatedEvent>()
+        verify(eventPublisher).publishEvent(captor.capture())
+        assertEquals(7L, captor.firstValue.uploaderUserId)
+    }
+
+    @Test
+    fun `위치가 없는 사진을 생성하면 이벤트를 발행하지 않는다`() {
+        val photo = createPhoto(albumId = 1L, location = createLocation(0.0, 0.0))
+        val savedPhoto =
+            createPhoto(
+                id = 42L,
+                albumId = 1L,
+                coupleId = 1L,
+                location = createLocation(0.0, 0.0),
+            )
+        doNothing().`when`(photoStoragePort).verifyFileExists(photo.url)
+        doNothing().`when`(currentCoupleAlbumResolver).validateAlbumBelongsToCurrentCouple(1L, 1L, ErrorField.UPLOADED_BY_ID)
+        `when`(mapQueryService.getLocationInfo(anyDouble(), anyDouble())).thenReturn(
+            LocationInfoReadModel(address = null, placeName = null, regionName = null),
+        )
+        `when`(photoRepository.save(anyObject())).thenReturn(savedPhoto)
+
+        photoCommandService.create(photo)
+
+        verify(eventPublisher, never()).publishEvent(anyObject<Any>())
     }
 
     @Test

@@ -4,6 +4,7 @@ import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.common.exception.ErrorField
 import kr.co.lokit.api.common.exception.errorDetailsOf
 import kr.co.lokit.api.config.security.JwtTokenProvider
+import kr.co.lokit.api.domain.notification.application.port.`in`.DeleteDeviceTokensUseCase
 import kr.co.lokit.api.domain.user.application.port.RefreshTokenRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.UserRepositoryPort
 import kr.co.lokit.api.domain.user.domain.AuthTokens
@@ -17,10 +18,12 @@ class AuthService(
     private val userRepository: UserRepositoryPort,
     private val refreshTokenRepository: RefreshTokenRepositoryPort,
     private val jwtTokenProvider: JwtTokenProvider,
+    private val deleteDeviceTokensUseCase: DeleteDeviceTokensUseCase,
 ) {
     @Transactional
     fun logout(userId: Long) {
         refreshTokenRepository.deleteByUserId(userId)
+        deleteDeviceTokensUseCase.deleteAllByUserId(userId)
     }
 
     @Transactional

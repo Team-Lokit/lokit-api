@@ -6,11 +6,17 @@ import kr.co.lokit.api.common.exception.errorDetailsOf
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.EmoticonRepositoryPort
+import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.`in`.CommentUseCase
 import kr.co.lokit.api.domain.photo.application.port.`in`.EmoticonUseCase
 import kr.co.lokit.api.domain.photo.domain.Comment
+import kr.co.lokit.api.domain.photo.domain.CommentCreatedEvent
+import kr.co.lokit.api.domain.photo.domain.CommentListViewedEvent
 import kr.co.lokit.api.domain.photo.domain.CommentWithEmoticons
 import kr.co.lokit.api.domain.photo.domain.Emoticon
+import kr.co.lokit.api.domain.photo.domain.EmoticonAddedEvent
+import kr.co.lokit.api.domain.photo.domain.PhotoViewerRole
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -19,6 +25,8 @@ class CommentService(
     private val commentRepository: CommentRepositoryPort,
     private val emoticonRepository: EmoticonRepositoryPort,
     private val coupleRepository: CoupleRepositoryPort,
+    private val eventPublisher: ApplicationEventPublisher,
+    private val photoRepository: PhotoRepositoryPort,
 ) : CommentUseCase,
     EmoticonUseCase {
     @Transactional
@@ -28,7 +36,11 @@ class CommentService(
         content: String,
     ): Comment {
         val comment = Comment(photoId = photoId, userId = userId, content = content)
-        return commentRepository.save(comment)
+        val saved = commentRepository.save(comment)
+        eventPublisher.publishEvent(
+            CommentCreatedEvent(commentId = saved.id, photoId = saved.photoId, actorUserId = saved.userId),
+        )
+        return saved
     }
 
     @Transactional(readOnly = true)
@@ -37,8 +49,18 @@ class CommentService(
         currentUserId: Long,
     ): List<CommentWithEmoticons> {
         val comments = commentRepository.findAllByPhotoIdWithEmoticons(photoId, currentUserId)
-        val deIdentifyUserId = coupleRepository.findByUserId(currentUserId)?.deIdentifiedUserId()
-            ?: return comments
+        val couple = coupleRepository.findByUserId(currentUserId)
+        val photoOwnerId = photoRepository.findUploaderIdById(photoId)
+        eventPublisher.publishEvent(
+            CommentListViewedEvent(
+                photoId = photoId,
+                viewerUserId = currentUserId,
+                photoOwnerId = photoOwnerId,
+                viewerRole = PhotoViewerRole.of(photoOwnerId, currentUserId, couple),
+                commentCount = comments.size,
+            ),
+        )
+        val deIdentifyUserId = couple?.deIdentifiedUserId() ?: return comments
         return comments.map { if (it.comment.userId == deIdentifyUserId) it.deIdentified() else it }
     }
 
@@ -80,7 +102,20 @@ class CommentService(
             )
         }
         val emoticon = Emoticon(commentId = commentId, userId = userId, emoji = emoji)
-        return emoticonRepository.save(emoticon)
+        val saved = emoticonRepository.save(emoticon)
+        // save 가 이미 CommentEntity 를 1차 캐시에 올려서 추가 SELECT 없음(F3).
+        // actorUserId 는 반응한 사람(userId)이다 — 댓글 작성자(comment.userId)가 아니다.
+        val comment = commentRepository.findById(commentId)
+        eventPublisher.publishEvent(
+            EmoticonAddedEvent(
+                emoticonId = saved.id,
+                commentId = commentId,
+                photoId = comment.photoId,
+                actorUserId = userId,
+                emoji = emoji,
+            ),
+        )
+        return saved
     }
 
     @Transactional

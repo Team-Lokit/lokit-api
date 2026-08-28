@@ -101,4 +101,15 @@ class JpaPhotoRepository(
         coupleId: Long,
         offset: Int,
     ): String? = photoJpaRepository.findUrlsByCoupleId(coupleId, PageRequest.of(offset, 1)).firstOrNull()
+
+    /** findAllById를 쓰지 않는다(D6/F7): toDomain()이 album.nonNullId()를 만져 트랜잭션 밖에서 LazyInit/N+1이 된다. */
+    @Transactional(readOnly = true)
+    override fun findAllByIds(ids: List<Long>): List<Photo> {
+        if (ids.isEmpty()) return emptyList()
+        return photoJpaRepository.findAllByIdsWithRelations(ids).map { it.toDomain() }
+    }
+
+    @Transactional(readOnly = true)
+    override fun findUploaderIdById(id: Long): Long =
+        photoJpaRepository.findUploaderIdById(id) ?: throw entityNotFound<Photo>(id)
 }
