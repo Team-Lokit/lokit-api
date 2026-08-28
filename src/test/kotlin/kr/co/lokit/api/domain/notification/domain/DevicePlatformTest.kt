@@ -5,10 +5,10 @@ import org.junit.jupiter.api.Test
 
 class DevicePlatformTest {
     @Test
-    fun `디바이스 플랫폼은 ANDROID 와 IOS 두 가지다`() {
+    fun `디바이스 플랫폼은 ANDROID, IOS, WEB 세 가지다`() {
         val names = DevicePlatform.entries.map { it.name }
 
-        assertEquals(listOf("ANDROID", "IOS"), names)
+        assertEquals(listOf("ANDROID", "IOS", "WEB"), names)
     }
 
     @Test
