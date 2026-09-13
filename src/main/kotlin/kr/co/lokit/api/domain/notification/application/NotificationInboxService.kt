@@ -46,6 +46,8 @@ class NotificationInboxService(
         notificationRepository.markAsRead(notification.id)
     }
 
+    override fun hasUnread(userId: Long): Boolean = notificationRepository.existsUnreadByRecipientUserId(userId)
+
     companion object {
         const val FIRST_PAGE: Int = 0
         const val MIN_PAGE_SIZE: Int = 1

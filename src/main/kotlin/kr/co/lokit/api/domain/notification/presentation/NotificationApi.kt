@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import kr.co.lokit.api.common.dto.PageResult
 import kr.co.lokit.api.domain.notification.dto.NotificationResponse
+import kr.co.lokit.api.domain.notification.dto.UnreadExistsResponse
 
 @SecurityRequirement(name = "Authorization")
 @Tag(name = "Notification", description = "알림함 API")
@@ -42,4 +43,14 @@ interface NotificationApi {
         @Parameter(hidden = true) userId: Long,
         notifId: String,
     )
+
+    @Operation(
+        summary = "안읽은 알림 존재 여부",
+        description = "홈 화면 배지용. 개수를 세지 않고 하나라도 있는지만 확인합니다.",
+    )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "조회 성공"),
+        ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
+    ])
+    fun hasUnreadNotifications(@Parameter(hidden = true) userId: Long): UnreadExistsResponse
 }

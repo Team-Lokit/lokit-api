@@ -162,6 +162,27 @@ class NotificationInboxServiceTest {
         assertTrue(exception.message.contains(UNKNOWN_NOTIF_ID))
     }
 
+    /**
+     * 🔴 신규 — 홈 화면 배지용 존재 확인 API. 목록 전체를 안 가져오고 포트의 exists 위임 하나로 끝나야 한다.
+     */
+    @Test
+    fun `안읽은 알림이 있으면 true를 돌려준다`() {
+        whenever(notificationRepository.existsUnreadByRecipientUserId(userId)).thenReturn(true)
+
+        val result = service.hasUnread(userId)
+
+        assertTrue(result)
+    }
+
+    @Test
+    fun `안읽은 알림이 없으면 false를 돌려준다`() {
+        whenever(notificationRepository.existsUnreadByRecipientUserId(userId)).thenReturn(false)
+
+        val result = service.hasUnread(userId)
+
+        assertFalse(result)
+    }
+
     companion object {
         private const val NOTIF_ID = "notif-1"
         private const val UNKNOWN_NOTIF_ID = "notif-does-not-exist"

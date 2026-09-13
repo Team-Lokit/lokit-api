@@ -34,3 +34,6 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pending_upload_couple_sent ON pendin
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_recipient_photo_closed ON notification (recipient_user_id, target_photo_id, group_closed_at);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_closed_sent ON notification (group_closed_at, sent_at);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_notif_id ON notification (notif_id);
+-- 홈 배지(existsUnreadByRecipientUserId) 전용. is_read=false 행만 담는 부분 인덱스라 크기가 작고,
+-- EXISTS 쿼리가 recipient_user_id로 이 인덱스만 찍고 바로 멈춘다(전체 스캔 없이 O(1)에 가깝다).
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_recipient_unread ON notification (recipient_user_id) WHERE is_read = false AND is_deleted = false;

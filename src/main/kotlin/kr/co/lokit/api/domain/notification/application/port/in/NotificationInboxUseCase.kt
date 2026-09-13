@@ -28,4 +28,7 @@ interface NotificationInboxUseCase {
         userId: Long,
         notifId: String,
     )
+
+    /** 홈 화면 배지용. 개수가 아니라 존재 여부만 — 항상 성공, 예외 없음. */
+    fun hasUnread(userId: Long): Boolean
 }
