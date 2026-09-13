@@ -107,6 +107,10 @@ class JpaNotificationRepository(
         return targets.size
     }
 
+    @Transactional(readOnly = true)
+    override fun existsUnreadByRecipientUserId(recipientUserId: Long): Boolean =
+        notificationJpaRepository.existsByRecipientUserIdAndIsReadFalse(recipientUserId)
+
     private fun NotificationEntity.toDomain(): Notification =
         Notification(
             id = id ?: 0L,

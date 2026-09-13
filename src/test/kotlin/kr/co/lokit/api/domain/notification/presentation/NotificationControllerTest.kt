@@ -243,4 +243,35 @@ class NotificationControllerTest {
         )
             .andExpect(status().isUnauthorized)
     }
+
+    // 신규 — 홈 배지 API
+    @Test
+    fun `안읽은 알림이 있으면 참을 내려준다`() {
+        whenever(notificationInboxUseCase.hasUnread(1L)).thenReturn(true)
+
+        mockMvc.perform(
+            get("/notifications/unread-exists")
+                .with(authentication(userAuth())),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.hasUnread").value(true))
+    }
+
+    @Test
+    fun `안읽은 알림이 없으면 거짓을 내려준다`() {
+        whenever(notificationInboxUseCase.hasUnread(1L)).thenReturn(false)
+
+        mockMvc.perform(
+            get("/notifications/unread-exists")
+                .with(authentication(userAuth())),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.hasUnread").value(false))
+    }
+
+    @Test
+    fun `인증되지 않은 사용자는 배지 조회를 할 수 없다`() {
+        mockMvc.perform(get("/notifications/unread-exists"))
+            .andExpect(status().isUnauthorized)
+    }
 }

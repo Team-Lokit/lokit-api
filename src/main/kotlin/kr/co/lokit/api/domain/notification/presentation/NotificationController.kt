@@ -4,6 +4,7 @@ import kr.co.lokit.api.common.annotation.CurrentUserId
 import kr.co.lokit.api.common.dto.PageResult
 import kr.co.lokit.api.domain.notification.application.port.`in`.NotificationInboxUseCase
 import kr.co.lokit.api.domain.notification.dto.NotificationResponse
+import kr.co.lokit.api.domain.notification.dto.UnreadExistsResponse
 import kr.co.lokit.api.domain.notification.presentation.mapping.toResponse
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -34,4 +35,8 @@ class NotificationController(
         @CurrentUserId userId: Long,
         @PathVariable notifId: String,
     ) = notificationInboxUseCase.markAsRead(userId, notifId)
+
+    @GetMapping("unread-exists")
+    override fun hasUnreadNotifications(@CurrentUserId userId: Long): UnreadExistsResponse =
+        UnreadExistsResponse(hasUnread = notificationInboxUseCase.hasUnread(userId))
 }

@@ -53,4 +53,10 @@ interface NotificationRepositoryPort {
      * 경계: sent_at == sentAtBefore는 삭제하지 않는다(strictly before).
      */
     fun deleteSentBefore(sentAtBefore: LocalDateTime, limit: Int): Int
+
+    /**
+     * 홈 화면 배지용. 수신자의 is_read=false 행이 하나라도 있는지만 본다(개수 세지 않음).
+     * @SoftDelete로 정리된 행은 자동 제외된다.
+     */
+    fun existsUnreadByRecipientUserId(recipientUserId: Long): Boolean
 }

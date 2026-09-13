@@ -462,6 +462,48 @@ class NotificationRepositoryTest {
         assertEquals(2L, repository.countInbox(1L))
     }
 
+    // ─────────────────────────── 홈 배지: 안읽은 알림 존재 확인 ───────────────────────────
+
+    @Test
+    fun `안읽은 알림이 하나라도 있으면 참이다`() {
+        repository.save(createNotification(notifId = "unread-1", recipientUserId = 1L, isRead = false))
+        flushAndClear()
+
+        assertTrue(repository.existsUnreadByRecipientUserId(1L))
+    }
+
+    @Test
+    fun `전부 읽었으면 거짓이다`() {
+        repository.save(createNotification(notifId = "read-1", recipientUserId = 1L, isRead = true))
+        flushAndClear()
+
+        assertFalse(repository.existsUnreadByRecipientUserId(1L))
+    }
+
+    /** 다른 사용자의 안읽은 알림이 내 배지를 켜면 안 된다. */
+    @Test
+    fun `다른 사용자의 안읽은 알림은 세지 않는다`() {
+        repository.save(createNotification(notifId = "others-unread", recipientUserId = 2L, isRead = false))
+        flushAndClear()
+
+        assertFalse(repository.existsUnreadByRecipientUserId(1L))
+    }
+
+    /**
+     * 🔴 되돌리기 신호 — 소프트삭제(정리 배치가 지운 30일 지난 알림)도 안읽음 상태로 남아 있을 수
+     * 있다. @SoftDelete 필터가 안 걸리면 이미 정리된 알림이 배지를 영원히 켜놓는다.
+     */
+    @Test
+    fun `소프트삭제된 안읽은 알림은 배지를 켜지 않는다`() {
+        val cutoff = Notification.retentionCutoff(now)
+        repository.save(createNotification(notifId = "expired-unread", recipientUserId = 1L, sentAt = cutoff.minusDays(1), isRead = false))
+        flushAndClear()
+        repository.deleteSentBefore(sentAtBefore = cutoff, limit = 500)
+        flushAndClear()
+
+        assertFalse(repository.existsUnreadByRecipientUserId(1L))
+    }
+
     private fun rawIsRead(id: Long): Boolean {
         val raw = entityManager
             .createNativeQuery("select is_read from notification where id = :id")

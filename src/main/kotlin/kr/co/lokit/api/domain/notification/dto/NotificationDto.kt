@@ -37,3 +37,13 @@ data class NotificationResponse(
     @Schema(description = "딥링크 힌트 주소. null 이면 prod 응답에서 필드 자체가 생략된다(non_null).", nullable = true)
     val targetAddress: String?,
 )
+
+/**
+ * 홈 화면 배지용. `hasUnread`는 "is"로 시작하지 않아 Kotlin이 getHasUnread()를 생성하므로
+ * isRead 와 달리 @get:JsonProperty 방어가 필요 없다(Jackson이 getX → x 로 정상 변환).
+ */
+@Schema(description = "안읽은 알림 존재 여부")
+data class UnreadExistsResponse(
+    @Schema(description = "안읽은 알림이 하나라도 있는지 여부", requiredMode = Schema.RequiredMode.REQUIRED)
+    val hasUnread: Boolean,
+)

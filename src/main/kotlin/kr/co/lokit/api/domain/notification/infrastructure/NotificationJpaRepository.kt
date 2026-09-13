@@ -38,4 +38,7 @@ interface NotificationJpaRepository : JpaRepository<NotificationEntity, Long> {
         sentAt: LocalDateTime,
         pageable: Pageable,
     ): List<NotificationEntity>
+
+    /** existsBy는 count 대신 LIMIT 1 스타일로 최적화된다 — 개수가 아니라 존재만 물을 때 이걸 쓴다. */
+    fun existsByRecipientUserIdAndIsReadFalse(recipientUserId: Long): Boolean
 }

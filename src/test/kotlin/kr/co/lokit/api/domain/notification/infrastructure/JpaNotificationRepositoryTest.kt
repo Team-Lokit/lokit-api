@@ -230,6 +230,16 @@ class JpaNotificationRepositoryTest {
         assertEquals("성동구 성수동", found.targetAddress)
     }
 
+    /** 신규 — 홈 배지용 존재 확인. 위임과 변환(Boolean→Boolean, 사실상 그대로 반환)만 검증한다. */
+    @Test
+    fun `안읽은 알림 존재 여부를 그대로 위임한다`() {
+        whenever(notificationJpaRepository.existsByRecipientUserIdAndIsReadFalse(7L)).thenReturn(true)
+        whenever(notificationJpaRepository.existsByRecipientUserIdAndIsReadFalse(8L)).thenReturn(false)
+
+        assertEquals(true, repository.existsUnreadByRecipientUserId(7L))
+        assertEquals(false, repository.existsUnreadByRecipientUserId(8L))
+    }
+
     /** R4 — 404/403 구분은 호출자 몫이다. 어댑터는 없으면 예외가 아니라 null 을 돌려준다(계약 2-2). */
     @Test
     fun `notifId로 조회하고 없으면 널을 반환한다`() {
