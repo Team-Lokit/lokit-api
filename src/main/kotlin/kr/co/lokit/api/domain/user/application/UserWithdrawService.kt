@@ -5,6 +5,7 @@ import kr.co.lokit.api.common.exception.ErrorField
 import kr.co.lokit.api.common.exception.errorDetailsOf
 import kr.co.lokit.api.config.cache.clearPermissionCaches
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
+import kr.co.lokit.api.domain.notification.application.port.`in`.DeleteDeviceTokensUseCase
 import kr.co.lokit.api.domain.user.application.port.RefreshTokenRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.UserRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.`in`.WithdrawUseCase
@@ -18,6 +19,7 @@ class UserWithdrawService(
     private val coupleRepository: CoupleRepositoryPort,
     private val refreshTokenRepository: RefreshTokenRepositoryPort,
     private val cacheManager: CacheManager,
+    private val deleteDeviceTokensUseCase: DeleteDeviceTokensUseCase,
 ) : WithdrawUseCase {
     @Transactional
     override fun withdraw(userId: Long) {
@@ -46,7 +48,10 @@ class UserWithdrawService(
         // 3. 즉시 비가역 탈퇴 처리(익명화 + 소프트삭제)
         userRepository.withdraw(userId)
 
-        // 4. 캐시 무효화
+        // 4. 모든 기기의 푸시 토큰 물리 삭제 — 탈퇴 계정으로 푸시가 나가지 않도록
+        deleteDeviceTokensUseCase.deleteAllByUserId(userId)
+
+        // 5. 캐시 무효화
 //        cacheManager.evictKey(CacheRegion.USER_DETAILS, user.email)
 //        cacheManager.evictUserCoupleCache(userId)
         cacheManager.clearPermissionCaches()

@@ -71,6 +71,63 @@ class DeviceTokenRepositoryTest {
     }
 
     @Test
+    fun `지정한 토큰들만 물리적으로 삭제하고 삭제 건수를 돌려준다`() {
+        repository.upsert(createDeviceToken(userId = 1L, token = "a", platform = DevicePlatform.ANDROID))
+        repository.upsert(createDeviceToken(userId = 1L, token = "b", platform = DevicePlatform.IOS))
+        repository.upsert(createDeviceToken(userId = 2L, token = "c", platform = DevicePlatform.ANDROID))
+        flushAndClear()
+
+        val deleted = repository.deleteAllByTokens(listOf("a", "b"))
+        flushAndClear()
+
+        assertEquals(2, deleted)
+        // 소프트삭제로 회귀하면 a, b 행이 물리적으로 남는다 — rawRowCount 로만 잡힌다.
+        assertEquals(1L, rawRowCount())
+        assertEquals(listOf("c"), repository.findAllByUserId(2L).map { it.token })
+    }
+
+    @Test
+    fun `빈 토큰 목록으로 삭제하면 0을 돌려주고 아무 행도 지우지 않는다`() {
+        repository.upsert(createDeviceToken(userId = 1L, token = "a", platform = DevicePlatform.ANDROID))
+        repository.upsert(createDeviceToken(userId = 2L, token = "c", platform = DevicePlatform.IOS))
+        flushAndClear()
+
+        val deleted = repository.deleteAllByTokens(emptyList<String>())
+        flushAndClear()
+
+        assertEquals(0, deleted)
+        assertEquals(2L, rawRowCount())
+    }
+
+    @Test
+    fun `사용자와 토큰으로 삭제하면 그 기기 행만 물리적으로 삭제하고 1을 돌려준다`() {
+        repository.upsert(createDeviceToken(userId = 1L, token = "fcm-1", platform = DevicePlatform.ANDROID))
+        repository.upsert(createDeviceToken(userId = 1L, token = "fcm-2", platform = DevicePlatform.IOS))
+        flushAndClear()
+
+        val deleted = repository.deleteByUserIdAndToken(1L, "fcm-1")
+        flushAndClear()
+
+        assertEquals(1, deleted)
+        // 소프트삭제로 회귀하면 fcm-1 행이 물리적으로 남는다 — rawRowCount 로만 잡힌다.
+        assertEquals(1L, rawRowCount())
+        assertEquals(listOf("fcm-2"), repository.findAllByUserId(1L).map { it.token })
+    }
+
+    @Test
+    fun `다른 사용자 소유 토큰은 사용자와 토큰으로 삭제해도 지워지지 않고 0을 돌려준다`() {
+        repository.upsert(createDeviceToken(userId = 2L, token = "fcm-1", platform = DevicePlatform.ANDROID))
+        flushAndClear()
+
+        val deleted = repository.deleteByUserIdAndToken(1L, "fcm-1")
+        flushAndClear()
+
+        assertEquals(0, deleted)
+        assertEquals(1L, rawRowCount())
+        assertEquals(listOf("fcm-1"), repository.findAllByUserId(2L).map { it.token })
+    }
+
+    @Test
     fun `한 사용자가 여러 기기를 등록하면 전부 조회된다`() {
         repository.upsert(createDeviceToken(userId = 1L, token = "fcm-1", platform = DevicePlatform.ANDROID))
         repository.upsert(createDeviceToken(userId = 1L, token = "fcm-2", platform = DevicePlatform.IOS))

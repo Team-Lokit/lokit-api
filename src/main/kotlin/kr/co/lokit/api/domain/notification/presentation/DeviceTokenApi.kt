@@ -15,7 +15,9 @@ interface DeviceTokenApi {
     @Operation(
         summary = "디바이스 토큰 등록",
         description = "FCM 토큰을 등록합니다. 로그인 직후와 앱 실행 시마다 호출하면 되며 멱등합니다. " +
-            "삭제 API는 없으며 로그아웃 시 자동으로 전부 삭제됩니다.",
+            "별도 삭제 API는 없습니다. 로그아웃 요청 본문에 deviceToken 을 보내면 그 기기의 토큰만, " +
+            "보내지 않으면 사용자의 토큰이 전부 삭제됩니다. " +
+            "FCM 이 UNREGISTERED 로 응답한 토큰은 서버가 발송 시 자동으로 정리합니다.",
     )
     @ApiResponses(value = [
         ApiResponse(responseCode = "204", description = "등록 성공"),

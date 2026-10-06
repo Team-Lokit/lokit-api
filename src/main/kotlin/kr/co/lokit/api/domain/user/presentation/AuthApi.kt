@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import kr.co.lokit.api.domain.user.dto.LogoutRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.RequestParam
 
@@ -69,7 +70,9 @@ interface AuthApi {
     @SecurityRequirement(name = "Authorization")
     @Operation(
         summary = "로그아웃",
-        description = "현재 로그인된 사용자의 세션을 종료합니다.",
+        description =
+            "현재 로그인된 사용자의 세션을 종료합니다. 요청 본문은 선택입니다. " +
+                "deviceToken 이 있으면 그 기기의 디바이스 토큰만 삭제하고, 없으면 사용자의 디바이스 토큰을 전부 삭제합니다.",
     )
     @ApiResponses(
         value = [
@@ -78,6 +81,7 @@ interface AuthApi {
     )
     fun logout(
         @Parameter(hidden = true) userId: Long,
+        request: LogoutRequest?,
         @Parameter(hidden = true) req: HttpServletRequest,
         @Parameter(hidden = true) res: HttpServletResponse,
     )

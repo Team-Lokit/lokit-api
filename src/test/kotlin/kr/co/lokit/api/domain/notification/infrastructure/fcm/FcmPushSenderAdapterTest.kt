@@ -8,14 +8,16 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.test.web.client.ExpectedCount.times
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath
 import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
-import org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound
 import org.springframework.test.web.client.response.MockRestResponseCreators.withServerError
+import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
 import kotlin.test.assertEquals
@@ -87,6 +89,9 @@ class FcmPushSenderAdapterTest {
     /**
      * 부분 실패 계약(D3): 가운데 토큰이 404 여도 루프가 멈추지 않고 3번째 기기까지 발송한다.
      * 404 기대에 token 값을 박아 "두 번째 토큰이 무효였다"를 요청 순서까지 포함해 고정한다.
+     *
+     * 무효 판정 계약(D1): invalidTokens 는 삭제 근거가 되므로 404 이면서 본문의
+     * `error.details[].errorCode == "UNREGISTERED"` 인 경우만 무효로 본다. 실제 FCM 응답 본문을 그대로 싣는다.
      */
     @Test
     fun `404 응답이면 무효 토큰으로 분류하고 나머지 기기 발송은 계속한다`() {
@@ -96,7 +101,7 @@ class FcmPushSenderAdapterTest {
             .andRespond(withSuccess())
         server.expect(requestTo(SEND_URL))
             .andExpect(jsonPath("$.message.token").value(TOKEN_2))
-            .andRespond(withResourceNotFound())
+            .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(APPLICATION_JSON).body(UNREGISTERED_BODY))
         server.expect(requestTo(SEND_URL))
             .andExpect(jsonPath("$.message.token").value(TOKEN_3))
             .andRespond(withSuccess())
@@ -108,7 +113,41 @@ class FcmPushSenderAdapterTest {
         server.verify()
         assertEquals(listOf(TOKEN_1, TOKEN_3), result.successTokens)
         assertEquals(listOf(TOKEN_2), result.invalidTokens)
-        assertTrue(result.failedTokens.isEmpty(), "404 는 재시도 가능 실패가 아니라 무효 토큰이다.")
+        assertTrue(result.failedTokens.isEmpty(), "404 UNREGISTERED 는 재시도 가능 실패가 아니라 무효 토큰이다.")
+    }
+
+    /**
+     * D1: 404 라도 UNREGISTERED 가 아니면(예: project-id 오설정으로 프로젝트가 없음) 토큰 탓이 아니다.
+     * 이걸 무효로 분류하면 설정 실수 한 번에 전 사용자 토큰이 삭제된다 → failedTokens 로 둔다.
+     */
+    @Test
+    fun `404 이지만 UNREGISTERED 가 아니면 무효가 아니라 재시도 가능 실패로 분류한다`() {
+        whenever(accessTokenProvider.accessToken()).thenReturn(ACCESS_TOKEN)
+        server.expect(requestTo(SEND_URL))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(APPLICATION_JSON).body(PROJECT_NOT_FOUND_BODY))
+
+        val result = adapter.send(PushMessage(tokens = listOf(TOKEN_1), title = TITLE, body = BODY))
+
+        server.verify()
+        assertEquals(listOf(TOKEN_1), result.failedTokens)
+        assertTrue(result.invalidTokens.isEmpty(), "UNREGISTERED 가 아닌 404 로 토큰을 삭제하면 안 된다.")
+    }
+
+    /**
+     * D1: 400 INVALID_ARGUMENT 는 대개 우리 payload 문제다. 모든 기기에 똑같이 나므로
+     * 무효로 분류하면 한 번의 배포 실수로 전 사용자 토큰이 지워진다 → failedTokens 로 둔다.
+     */
+    @Test
+    fun `400 INVALID_ARGUMENT 응답이면 무효가 아니라 재시도 가능 실패로 분류한다`() {
+        whenever(accessTokenProvider.accessToken()).thenReturn(ACCESS_TOKEN)
+        server.expect(requestTo(SEND_URL))
+            .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(APPLICATION_JSON).body(INVALID_ARGUMENT_BODY))
+
+        val result = adapter.send(PushMessage(tokens = listOf(TOKEN_1), title = TITLE, body = BODY))
+
+        server.verify()
+        assertEquals(listOf(TOKEN_1), result.failedTokens)
+        assertTrue(result.invalidTokens.isEmpty(), "400 INVALID_ARGUMENT 로 토큰을 삭제하면 안 된다.")
     }
 
     /**
@@ -155,5 +194,20 @@ class FcmPushSenderAdapterTest {
         private const val TOKEN_1 = "device-token-1"
         private const val TOKEN_2 = "device-token-2"
         private const val TOKEN_3 = "device-token-3"
+
+        private val UNREGISTERED_BODY =
+            """
+            {"error":{"code":404,"status":"NOT_FOUND","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"UNREGISTERED"}]}}
+            """.trimIndent()
+
+        private val PROJECT_NOT_FOUND_BODY =
+            """
+            {"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND"}}
+            """.trimIndent()
+
+        private val INVALID_ARGUMENT_BODY =
+            """
+            {"error":{"code":400,"message":"The registration token is not a valid FCM registration token","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"INVALID_ARGUMENT"}]}}
+            """.trimIndent()
     }
 }

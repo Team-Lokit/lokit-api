@@ -3,6 +3,7 @@ package kr.co.lokit.api.domain.notification.infrastructure
 import kr.co.lokit.api.domain.notification.application.port.DeviceTokenRepositoryPort
 import kr.co.lokit.api.domain.notification.domain.DeviceToken
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 
 @Repository
 class JpaDeviceTokenRepository(
@@ -28,6 +29,16 @@ class JpaDeviceTokenRepository(
 
     override fun findAllByUserId(userId: Long): List<DeviceToken> =
         deviceTokenJpaRepository.findAllByUserId(userId).map { it.toDomain() }
+
+    @Transactional
+    override fun deleteAllByTokens(tokens: Collection<String>): Int {
+        if (tokens.isEmpty()) return 0
+        return deviceTokenJpaRepository.hardDeleteAllByTokenIn(tokens)
+    }
+
+    @Transactional
+    override fun deleteByUserIdAndToken(userId: Long, token: String): Int =
+        deviceTokenJpaRepository.hardDeleteByUserIdAndToken(userId, token)
 
     private fun DeviceTokenEntity.toDomain(): DeviceToken =
         DeviceToken(id = id ?: 0L, userId = userId, token = token, platform = platform)

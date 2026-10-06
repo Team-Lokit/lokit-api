@@ -20,4 +20,9 @@ class DeviceTokenService(
     override fun deleteAllByUserId(userId: Long) {
         deviceTokenRepository.deleteAllByUserId(userId)
     }
+
+    @Transactional
+    override fun deleteByUserIdAndToken(userId: Long, token: String) {
+        deviceTokenRepository.deleteByUserIdAndToken(userId, token)
+    }
 }

@@ -12,9 +12,11 @@ import org.springframework.http.MediaType
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
+import tools.jackson.databind.json.JsonMapper
 
 /**
  * FCM HTTP v1은 토큰 1건씩만 전송(D3). 어떤 경우에도 예외를 던지지 않고 PushSendResult로 반환.
+ * 무효 판정은 404 + error.details[].errorCode == "UNREGISTERED" 만 invalidTokens(삭제 대상), 그 외 404·400 은 failedTokens.
  * restClient를 기본값 파라미터로 둔 이유(F14): 컨텍스트에 RestClient 빈이 없어 안전.
  * 테스트: RestClient.builder() + MockRestServiceServer.bindTo(builder) 로 실제 네트워크 없이 검증.
  */
@@ -58,8 +60,10 @@ class FcmPushSenderAdapter(
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(requestBody(token, message))
                 .retrieve()
-                .onStatus({ it == HttpStatus.NOT_FOUND || it == HttpStatus.BAD_REQUEST }) { _, _ ->
-                    throw InvalidTokenException()
+                .onStatus({ it == HttpStatus.NOT_FOUND }) { _, response ->
+                    val body = runCatching { response.body.readAllBytes().decodeToString() }.getOrDefault("")
+                    if (isUnregistered(body)) throw InvalidTokenException()
+                    throw FcmErrorResponseException(body.take(ERROR_BODY_LOG_LENGTH))
                 }
                 .toBodilessEntity()
             SendOutcome.SUCCESS
@@ -69,6 +73,13 @@ class FcmPushSenderAdapter(
             log.warn("FCM 발송 실패: tokenSuffix={}", token.takeLast(TOKEN_LOG_SUFFIX_LENGTH), e)
             SendOutcome.RETRYABLE_FAILURE
         }
+
+    // D1: 404 + error.details[].errorCode == "UNREGISTERED" 만 무효 토큰. 파싱 실패는 무효 아님.
+    private fun isUnregistered(body: String): Boolean =
+        runCatching {
+            JSON_MAPPER.readTree(body).path("error").path("details")
+                .any { it.path("errorCode").asString() == UNREGISTERED }
+        }.getOrDefault(false)
 
     private fun requestBody(token: String, message: PushMessage): Map<String, Any> =
         mapOf(
@@ -84,8 +95,13 @@ class FcmPushSenderAdapter(
 
     private class InvalidTokenException : RuntimeException()
 
+    private class FcmErrorResponseException(body: String) : RuntimeException("FCM 404 응답: $body")
+
     companion object {
         private const val TOKEN_LOG_SUFFIX_LENGTH = 8
+        private const val ERROR_BODY_LOG_LENGTH = 300
+        private const val UNREGISTERED = "UNREGISTERED"
+        private val JSON_MAPPER = JsonMapper.builder().build()
     }
 }
 

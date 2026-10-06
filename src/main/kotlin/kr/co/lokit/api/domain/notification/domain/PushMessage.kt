@@ -12,7 +12,10 @@ data class PushMessage(
     }
 }
 
-/** 부분 실패 허용(D3). invalidTokens는 UNREGISTERED 등 '이제 무효' 판정 — 수집·로깅만, 삭제 안 함(G-A). */
+/**
+ * 부분 실패 허용(D3). invalidTokens 에는 FCM 이 404 + UNREGISTERED 로 응답한 토큰만 담긴다(그 외 404·400 은 failedTokens).
+ * NotificationDispatchService 가 발송 직후 이 토큰들을 device_token 에서 물리 삭제한다.
+ */
 data class PushSendResult(
     val successTokens: List<String> = emptyList(),
     val failedTokens: List<String> = emptyList(),
