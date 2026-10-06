@@ -2,6 +2,7 @@ package kr.co.lokit.api.domain.user.presentation
 
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import jakarta.validation.Valid
 import kr.co.lokit.api.common.annotation.CurrentUserId
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.common.exception.ErrorCode
@@ -10,6 +11,7 @@ import kr.co.lokit.api.domain.couple.application.CoupleCookieStatusResolver
 import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.domain.user.application.OAuthLoginServiceRegistry
 import kr.co.lokit.api.domain.user.application.port.OAuthProvider
+import kr.co.lokit.api.domain.user.dto.LogoutRequest
 import kr.co.lokit.api.domain.user.infrastructure.oauth.apple.AppleOAuthProperties
 import kr.co.lokit.api.domain.user.infrastructure.oauth.kakao.KakaoOAuthProperties
 import org.slf4j.LoggerFactory
@@ -192,10 +194,11 @@ class AuthController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     override fun logout(
         @CurrentUserId userId: Long,
+        @RequestBody(required = false) @Valid request: LogoutRequest?,
         req: HttpServletRequest,
         res: HttpServletResponse,
     ) {
-        authService.logout(userId)
+        authService.logout(userId, request?.deviceToken)
         res.setHeader(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate, max-age=0")
         res.setHeader("Pragma", "no-cache")
         res.setDateHeader("Expires", 0)

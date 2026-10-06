@@ -16,4 +16,12 @@ interface DeviceTokenJpaRepository : JpaRepository<DeviceTokenEntity, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "delete from device_token where user_id = :userId", nativeQuery = true)
     fun hardDeleteAllByUserId(userId: Long): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "delete from device_token where token in (:tokens)", nativeQuery = true)
+    fun hardDeleteAllByTokenIn(tokens: Collection<String>): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "delete from device_token where user_id = :userId and token = :token", nativeQuery = true)
+    fun hardDeleteByUserIdAndToken(userId: Long, token: String): Int
 }

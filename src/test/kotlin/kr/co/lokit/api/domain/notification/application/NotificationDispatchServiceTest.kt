@@ -16,6 +16,7 @@ import kr.co.lokit.api.fixture.createDeviceToken
 import kr.co.lokit.api.fixture.createNotification
 import kr.co.lokit.api.fixture.createUser
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
@@ -266,6 +267,51 @@ class NotificationDispatchServiceTest {
         assertEquals(1, params["success_count"])
         assertEquals(2, params["failure_count"])
         assertEquals(1, params["invalid_count"])
+    }
+
+    /** 슬라이스 B 공통 준비: 새 윈도우 → 토큰 1개 → 주어진 발송 결과. */
+    private fun givenPushResult(result: PushSendResult) {
+        whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
+            .thenReturn(null)
+        whenever(notificationRepository.save(any())).thenReturn(createNotification(notifId = "notif-9"))
+        whenever(deviceTokenRepository.findAllByUserId(RECIPIENT_ID)).thenReturn(
+            listOf(createDeviceToken(id = 1L, userId = RECIPIENT_ID, token = "fcm-a")),
+        )
+        whenever(pushSenderPort.send(any())).thenReturn(result)
+    }
+
+    @Test
+    fun `발송 결과에 무효 토큰이 있으면 그 토큰들을 삭제한다`() {
+        givenPushResult(PushSendResult(successTokens = listOf("fcm-a"), invalidTokens = listOf("fcm-c")))
+
+        notifyComment()
+
+        verify(deviceTokenRepository).deleteAllByTokens(listOf("fcm-c"))
+    }
+
+    @Test
+    fun `발송 결과에 무효 토큰이 없으면 토큰 삭제를 호출하지 않는다`() {
+        givenPushResult(PushSendResult(successTokens = listOf("fcm-a")))
+
+        notifyComment()
+
+        verify(deviceTokenRepository, never()).deleteAllByTokens(any())
+    }
+
+    @Test
+    fun `무효 토큰 삭제가 실패해도 예외 없이 끝나고 push_send 이벤트는 기록된다`() {
+        givenPushResult(PushSendResult(successTokens = listOf("fcm-a"), invalidTokens = listOf("fcm-c")))
+        whenever(deviceTokenRepository.deleteAllByTokens(any())).thenThrow(RuntimeException("db down"))
+
+        assertDoesNotThrow { notifyComment() }
+
+        verify(appEventLogPort).record(
+            eventName = eq("push_send"),
+            userId = eq(RECIPIENT_ID),
+            notifId = eq("notif-9"),
+            notifType = eq("COMMENT"),
+            params = any(),
+        )
     }
 
     @Test

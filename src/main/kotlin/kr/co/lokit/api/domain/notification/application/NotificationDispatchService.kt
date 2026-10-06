@@ -170,9 +170,31 @@ class NotificationDispatchService(
                     "invalid_count" to result.invalidTokens.size,
                 ),
         )
-        if (result.invalidTokens.isNotEmpty()) {
-            log.info("무효 FCM 토큰 감지: count={}, notifId={}", result.invalidTokens.size, notification.notifId)
-        }
+        cleanUpInvalidTokens(result.invalidTokens, notification.notifId)
+    }
+
+    /** FCM 이 UNREGISTERED 로 판정한 토큰을 물리 삭제한다. 실패해도 예외를 던지지 않고 warn 로그만 남긴다. */
+    private fun cleanUpInvalidTokens(
+        invalidTokens: List<String>,
+        notifId: String,
+    ) {
+        if (invalidTokens.isEmpty()) return
+        runCatching { deviceTokenRepository.deleteAllByTokens(invalidTokens) }
+            .onSuccess { deleted ->
+                log.info(
+                    "무효 FCM 토큰 삭제: detected={}, deleted={}, notifId={}",
+                    invalidTokens.size,
+                    deleted,
+                    notifId,
+                )
+            }.onFailure { e ->
+                log.warn(
+                    "무효 FCM 토큰 삭제 실패: count={}, notifId={}",
+                    invalidTokens.size,
+                    notifId,
+                    e,
+                )
+            }
     }
 
     companion object {

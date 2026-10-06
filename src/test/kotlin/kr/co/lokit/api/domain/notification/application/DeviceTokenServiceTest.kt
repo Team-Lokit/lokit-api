@@ -42,4 +42,11 @@ class DeviceTokenServiceTest {
 
         verify(deviceTokenRepository).deleteAllByUserId(7L)
     }
+
+    @Test
+    fun `사용자와 토큰으로 디바이스 토큰 하나를 삭제한다`() {
+        deviceTokenService.deleteByUserIdAndToken(1L, "fcm-1")
+
+        verify(deviceTokenRepository).deleteByUserIdAndToken(1L, "fcm-1")
+    }
 }

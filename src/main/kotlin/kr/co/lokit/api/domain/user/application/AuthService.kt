@@ -21,9 +21,13 @@ class AuthService(
     private val deleteDeviceTokensUseCase: DeleteDeviceTokensUseCase,
 ) {
     @Transactional
-    fun logout(userId: Long) {
+    fun logout(userId: Long, deviceToken: String? = null) {
         refreshTokenRepository.deleteByUserId(userId)
-        deleteDeviceTokensUseCase.deleteAllByUserId(userId)
+        if (deviceToken.isNullOrBlank()) {
+            deleteDeviceTokensUseCase.deleteAllByUserId(userId)
+        } else {
+            deleteDeviceTokensUseCase.deleteByUserIdAndToken(userId, deviceToken)
+        }
     }
 
     @Transactional
