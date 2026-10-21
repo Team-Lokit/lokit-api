@@ -186,7 +186,7 @@ class NotificationTest {
         targetPhotoId = targetPhotoId,
         targetAddress = targetAddress,
         photoCount = photoCount,
-        title = "새 사진",
+        title = "새로운 추억",
         body = "지민님이 사진을 올렸어요",
         sentAt = sentAt,
     )

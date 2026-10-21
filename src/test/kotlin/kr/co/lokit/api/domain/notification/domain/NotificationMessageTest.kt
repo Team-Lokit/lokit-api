@@ -18,18 +18,23 @@ class NotificationMessageTest {
     }
 
     @Test
-    fun `반응 알림 제목은 새 반응이다`() {
-        assertEquals("새 반응", NotificationMessage.title(NotificationType.REACTION))
+    fun `업로드 알림 제목은 새로운 추억이다`() {
+        assertEquals("새로운 추억", NotificationMessage.title(NotificationType.UPLOAD))
+    }
+
+    @Test
+    fun `반응 알림 제목은 새로운 반응이다`() {
+        assertEquals("새로운 반응", NotificationMessage.title(NotificationType.REACTION))
     }
 
     @Test
     fun `그룹 개수가 1이면 타입별 단일 문구를 쓴다`() {
         assertEquals(
-            "지민님이 댓글을 남겼어요",
+            "지민님이 내 사진에 댓글을 남겼어요",
             NotificationMessage.body("지민", NotificationType.COMMENT, 1),
         )
         assertEquals(
-            "지민님이 반응을 남겼어요",
+            "지민님이 내 사진에 반응을 남겼어요",
             NotificationMessage.body("지민", NotificationType.REACTION, 1),
         )
     }
@@ -58,7 +63,7 @@ class NotificationMessageTest {
     @Test
     fun `단건 반응 알림은 이모지를 본문에 담는다`() {
         assertEquals(
-            "지민님이 ❤️ 반응을 남겼어요",
+            "지민님이 내 사진에 ❤️ 반응을 남겼어요",
             NotificationMessage.body("지민", NotificationType.REACTION, 1, emoji = "❤️"),
         )
     }
@@ -66,7 +71,7 @@ class NotificationMessageTest {
     @Test
     fun `이모지가 없으면 기존처럼 일반 반응 문구를 쓴다`() {
         assertEquals(
-            "지민님이 반응을 남겼어요",
+            "지민님이 내 사진에 반응을 남겼어요",
             NotificationMessage.body("지민", NotificationType.REACTION, 1, emoji = null),
         )
     }
@@ -74,7 +79,7 @@ class NotificationMessageTest {
     @Test
     fun `댓글 알림은 이모지 인자를 받아도 무시한다`() {
         assertEquals(
-            "지민님이 댓글을 남겼어요",
+            "지민님이 내 사진에 댓글을 남겼어요",
             NotificationMessage.body("지민", NotificationType.COMMENT, 1, emoji = "❤️"),
         )
     }
@@ -82,7 +87,7 @@ class NotificationMessageTest {
     @Test
     fun `행위자 이름이 비어 있으면 기본 이름을 쓴다`() {
         assertEquals(
-            "상대방님이 댓글을 남겼어요",
+            "상대방님이 내 사진에 댓글을 남겼어요",
             NotificationMessage.body("", NotificationType.COMMENT, 1),
         )
         assertEquals("상대방", NotificationMessage.DEFAULT_ACTOR_NAME)

@@ -103,7 +103,7 @@ class NotificationDispatchServiceTest {
         assertEquals(PHOTO_ID, saved.targetPhotoId)
         assertEquals(1, saved.groupCount)
         assertEquals("새 댓글", saved.title)
-        assertEquals("지민님이 댓글을 남겼어요", saved.body)
+        assertEquals("지민님이 내 사진에 댓글을 남겼어요", saved.body)
         assertEquals(NOW, saved.sentAt)
     }
 
@@ -112,7 +112,7 @@ class NotificationDispatchServiceTest {
         whenever(notificationRepository.findLatestUnclosedByRecipientAndPhoto(RECIPIENT_ID, PHOTO_ID, NotificationType.COMMENT))
             .thenReturn(null)
         whenever(notificationRepository.save(any())).thenReturn(
-            createNotification(notifId = "notif-9", title = "새 댓글", body = "지민님이 댓글을 남겼어요"),
+            createNotification(notifId = "notif-9", title = "새 댓글", body = "지민님이 내 사진에 댓글을 남겼어요"),
         )
         whenever(deviceTokenRepository.findAllByUserId(RECIPIENT_ID)).thenReturn(
             listOf(
@@ -135,7 +135,7 @@ class NotificationDispatchServiceTest {
         val message = captor.firstValue
         assertEquals(listOf("fcm-a", "fcm-b"), message.tokens)
         assertEquals("새 댓글", message.title)
-        assertEquals("지민님이 댓글을 남겼어요", message.body)
+        assertEquals("지민님이 내 사진에 댓글을 남겼어요", message.body)
         assertEquals("notif-9", message.data["notifId"])
         assertEquals("COMMENT", message.data["notifType"])
         assertEquals("10", message.data["photoId"])
@@ -227,7 +227,7 @@ class NotificationDispatchServiceTest {
 
         val captor = argumentCaptor<Notification>()
         verify(notificationRepository).save(captor.capture())
-        assertEquals("지민님이 ❤️ 반응을 남겼어요", captor.firstValue.body)
+        assertEquals("지민님이 내 사진에 ❤️ 반응을 남겼어요", captor.firstValue.body)
     }
 
     @Test
@@ -467,7 +467,7 @@ class NotificationDispatchServiceTest {
         verify(pushSenderPort).send(pushCaptor.capture())
         val message = pushCaptor.firstValue
         assertEquals(listOf("fcm-a"), message.tokens)
-        assertEquals("새 사진", message.title)
+        assertEquals("새로운 추억", message.title)
         assertEquals("upload-saved", message.data["notifId"])
         assertEquals("UPLOAD", message.data["notifType"])
         assertEquals(UPLOAD_ADDRESS, message.data["targetAddress"])
@@ -656,7 +656,7 @@ class NotificationDispatchServiceTest {
             targetPhotoId = PHOTO_ID,
             targetAddress = UPLOAD_ADDRESS,
             photoCount = 2,
-            title = "새 사진",
+            title = "새로운 추억",
             body = "지민님이 ${UPLOAD_ADDRESS}에 사진 2장을 올렸어요",
             sentAt = NOW,
         )
