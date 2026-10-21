@@ -9,8 +9,8 @@ object NotificationMessage {
     fun title(notificationType: NotificationType): String =
         when (notificationType) {
             NotificationType.COMMENT -> "새 댓글"
-            NotificationType.REACTION -> "새 반응"
-            NotificationType.UPLOAD -> "새 사진"
+            NotificationType.REACTION -> "새로운 반응"
+            NotificationType.UPLOAD -> "새로운 추억"
         }
 
     /**
@@ -35,9 +35,9 @@ object NotificationMessage {
             }
         } else {
             when (notificationType) {
-                NotificationType.COMMENT -> "${name}님이 댓글을 남겼어요"
+                NotificationType.COMMENT -> "${name}님이 내 사진에 댓글을 남겼어요"
                 NotificationType.REACTION ->
-                    if (emoji != null) "${name}님이 ${emoji} 반응을 남겼어요" else "${name}님이 반응을 남겼어요"
+                    if (emoji != null) "${name}님이 내 사진에 ${emoji} 반응을 남겼어요" else "${name}님이 내 사진에 반응을 남겼어요"
                 NotificationType.UPLOAD -> "${name}님이 사진을 올렸어요"
             }
         }
