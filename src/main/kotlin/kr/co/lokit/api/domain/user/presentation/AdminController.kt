@@ -1,6 +1,8 @@
 package kr.co.lokit.api.domain.user.presentation
 
+import jakarta.servlet.http.HttpServletRequest
 import kr.co.lokit.api.common.annotation.CurrentUserId
+import kr.co.lokit.api.common.annotation.SyncCoupleStatusCookie
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.config.cache.clearAllCaches
 import kr.co.lokit.api.config.security.JwtTokenProvider
@@ -9,6 +11,7 @@ import kr.co.lokit.api.domain.album.domain.Album
 import kr.co.lokit.api.domain.album.infrastructure.AlbumJpaRepository
 import kr.co.lokit.api.domain.couple.application.CoupleCommandService
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
+import kr.co.lokit.api.domain.couple.application.port.`in`.CoupleInviteUseCase
 import kr.co.lokit.api.domain.couple.domain.Couple
 import kr.co.lokit.api.domain.couple.infrastructure.CoupleJpaRepository
 import kr.co.lokit.api.domain.map.infrastructure.AlbumBoundsJpaRepository
@@ -44,6 +47,7 @@ import java.time.LocalDateTime
 class AdminController(
     private val userJpaRepository: UserJpaRepository,
     private val createCoupleUseCase: CoupleCommandService,
+    private val coupleInviteUseCase: CoupleInviteUseCase,
     private val refreshTokenRepository: RefreshTokenRepositoryPort,
     private val coupleJpaRepository: CoupleJpaRepository,
     private val albumJpaRepository: AlbumJpaRepository,
@@ -114,11 +118,13 @@ class AdminController(
         }
     }
 
+    @SyncCoupleStatusCookie
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("couples/partner")
     @Transactional
     override fun createCouplePartner(
         @CurrentUserId userId: Long,
+        httpRequest: HttpServletRequest,
     ): AdminPartnerResponse {
         val primaryUser =
             userJpaRepository.findById(userId).orElseThrow {
@@ -140,7 +146,7 @@ class AdminController(
                     ),
                 ).toDomain()
 
-        createCoupleUseCase.createIfNone(Couple(name = Couple.DEFAULT_COUPLE_NAME), partnerUser.id)
+        linkWithPartner(primaryUser.nonNullId(), partnerUser.id, httpRequest.remoteAddr)
 
         val accessToken = jwtTokenProvider.generateAccessToken(partnerUser)
         val refreshToken = jwtTokenProvider.generateRefreshToken()
@@ -164,6 +170,25 @@ class AdminController(
                     refreshToken = refreshToken,
                 ),
         )
+    }
+
+    /**
+     * 초대 코드 입력 없이 실제 초대 흐름(파트너 발급 → 호출자 합류)을 그대로 태운다.
+     * 프로필 이미지(LOCK/KEY)·캐시 무효화·호출자의 미완성 커플 정리를 joinByInviteCode 가 맡는다.
+     * 이미 이 파트너와 연결돼 있으면 그대로 두고, 다른 사람과 연결돼 있으면 덮어쓰지 않고 거절한다.
+     */
+    private fun linkWithPartner(
+        userId: Long,
+        partnerId: Long,
+        clientIp: String,
+    ) {
+        coupleRepository.findByUserId(userId)?.takeIf { it.isConnectedAndFull() }?.let { couple ->
+            if (couple.isMember(partnerId)) return
+            throw BusinessException.InviteAlreadyCoupledException()
+        }
+        createCoupleUseCase.createIfNone(Couple(name = Couple.DEFAULT_COUPLE_NAME), partnerId)
+        val inviteCode = coupleInviteUseCase.generateInviteCode(partnerId).inviteCode
+        coupleInviteUseCase.joinByInviteCode(userId, inviteCode, clientIp)
     }
 
     @PostMapping("couples/migrate")
