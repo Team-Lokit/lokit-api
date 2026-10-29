@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.security.SecurityRequirements
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.servlet.http.HttpServletRequest
 import kr.co.lokit.api.domain.user.dto.AdminActionResponse
 import kr.co.lokit.api.domain.user.dto.AdminCoupleMigrationResponse
 import kr.co.lokit.api.domain.user.dto.AdminPartnerResponse
@@ -52,15 +53,20 @@ interface AdminApi {
 
     @Operation(
         summary = "개발용 커플 테스트 파트너 생성",
-        description = "파트너 유저 1명을 생성(또는 재사용)하고 파트너 JWT를 발급합니다.",
+        description =
+            "파트너 유저 1명을 생성(또는 재사용)하고 호출자와 커플 연결까지 완료한 뒤 파트너 JWT를 발급합니다. " +
+                "초대 코드 입력이 필요 없으며, 호출자의 커플 상태 쿠키도 함께 갱신됩니다. " +
+                "이미 이 파트너와 연결돼 있으면 연결은 그대로 두고 토큰만 재발급합니다.",
         responses = [
             ApiResponse(responseCode = "201", description = "생성 성공"),
             ApiResponse(responseCode = "400", description = "입력 오류/연결 불가 상태"),
+            ApiResponse(responseCode = "409", description = "호출자가 이미 다른 사용자와 커플로 연결됨"),
         ],
     )
     @SecurityRequirement(name = "Authorization")
     fun createCouplePartner(
         @Parameter(hidden = true) userId: Long,
+        @Parameter(hidden = true) httpRequest: HttpServletRequest,
     ): AdminPartnerResponse
 
     @Operation(
