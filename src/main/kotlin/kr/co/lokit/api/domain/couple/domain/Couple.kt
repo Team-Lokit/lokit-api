@@ -30,6 +30,19 @@ data class Couple(
 
     fun partnerIdFor(userId: Long): Long? = userIds.firstOrNull { it != userId }
 
+    /** userIds 기반 멤버십. partnerIdFor 와 달리 비멤버에게 거짓 양성을 주지 않는다. */
+    fun isMember(userId: Long): Boolean = userIds.contains(userId)
+
+    /**
+     * 두 사용자가 이 커플의 서로 다른 두 멤버인가.
+     * partnerIdFor(x) == y 로 대체하지 말 것 — 비멤버 x 에 대해 userIds[0] 을 반환하는 함정이 있다.
+     * status 는 보지 않는다: 연결 해제 후에도 신원 관계는 유지된다는 것이 이 메서드의 계약이다.
+     */
+    fun arePartners(
+        userIdA: Long,
+        userIdB: Long,
+    ): Boolean = userIdA != userIdB && isMember(userIdA) && isMember(userIdB)
+
     fun deIdentifiedUserId(): Long? = disconnectedByUserId.takeIf { status.isDisconnectedOrExpired }
 
     fun isConnectedAndFull(): Boolean = status == CoupleStatus.CONNECTED && isFull()

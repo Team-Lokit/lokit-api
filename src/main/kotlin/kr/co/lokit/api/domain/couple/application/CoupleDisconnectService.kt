@@ -10,6 +10,7 @@ import kr.co.lokit.api.domain.couple.application.port.`in`.CreateCoupleUseCase
 import kr.co.lokit.api.domain.couple.application.port.`in`.DisconnectCoupleUseCase
 import kr.co.lokit.api.domain.couple.domain.Couple
 import kr.co.lokit.api.domain.couple.domain.CoupleDisconnectAction
+import kr.co.lokit.api.domain.notification.application.port.`in`.CancelPendingUploadNotificationsUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.cache.CacheManager
 import org.springframework.stereotype.Service
@@ -20,6 +21,7 @@ class CoupleDisconnectService(
     private val coupleRepository: CoupleRepositoryPort,
     private val createCoupleUseCase: CreateCoupleUseCase,
     private val cacheManager: CacheManager,
+    private val cancelPendingUploadNotificationsUseCase: CancelPendingUploadNotificationsUseCase,
 ) : DisconnectCoupleUseCase {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -53,6 +55,7 @@ class CoupleDisconnectService(
                 }
             }
         }
+        cancelPendingUploadNotificationsUseCase.cancelByCoupleId(couple.id)
         cacheManager.evictUserCoupleCache(userId, *couple.userIds.filter { it != userId }.toLongArray())
         createCoupleUseCase.createIfNone(Couple(name = Couple.DEFAULT_COUPLE_NAME), userId)
         evictPermissionCaches()

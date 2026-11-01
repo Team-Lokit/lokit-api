@@ -85,7 +85,7 @@ class PhotoCommandService(
         val effectivePhoto = photo.withAddress(locationInfo.address).withDefaultAlbum(defaultAlbum?.id)
         val saved = photoRepository.save(effectivePhoto)
 
-        publishPhotoCreatedEventIfNeeded(effectivePhoto, saved.coupleId)
+        publishPhotoCreatedEventIfNeeded(saved)
         evictMapCachesForPhotoIfNeeded(saved)
         return saved
     }
@@ -139,20 +139,20 @@ class PhotoCommandService(
         eventPublisher.publishEvent(PhotoDeletedEvent(photoUrl = photo.url))
     }
 
-    private fun publishPhotoCreatedEventIfNeeded(
-        photo: Photo,
-        coupleId: Long?,
-    ) {
-        if (!photo.canPublishLocationEvent(coupleId)) {
+    /** saved를 받는다 — effectivePhoto는 아직 id=0이라 photoId를 실을 수 없다(F3). */
+    private fun publishPhotoCreatedEventIfNeeded(photo: Photo) {
+        if (!photo.canPublishLocationEvent(photo.coupleId)) {
             return
         }
-        val targetCoupleId = coupleId ?: return
+        val targetCoupleId = photo.coupleId ?: return
         eventPublisher.publishEvent(
             PhotoCreatedEvent(
                 albumId = photo.albumId!!,
                 coupleId = targetCoupleId,
                 longitude = photo.location.longitude,
                 latitude = photo.location.latitude,
+                photoId = photo.id,
+                uploaderUserId = photo.uploadedById,
             ),
         )
     }

@@ -150,3 +150,4 @@ application-env.yaml
 .idea
 env.properties
 *.json
+_workspace*

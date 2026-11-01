@@ -29,4 +29,10 @@ interface PhotoJpaRepository : JpaRepository<PhotoEntity, Long> {
 
     @Query("SELECT COUNT(p) FROM Photo p WHERE p.album.couple.id = :coupleId")
     fun countByCoupleId(coupleId: Long): Long
+
+    @Query("SELECT p FROM Photo p JOIN FETCH p.album LEFT JOIN FETCH p.uploadedBy WHERE p.id IN :ids")
+    fun findAllByIdsWithRelations(ids: List<Long>): List<PhotoEntity>
+
+    @Query("SELECT p.uploadedById FROM Photo p WHERE p.id = :id")
+    fun findUploaderIdById(id: Long): Long?
 }
