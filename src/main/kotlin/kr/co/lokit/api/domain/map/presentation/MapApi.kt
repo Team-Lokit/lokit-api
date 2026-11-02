@@ -148,12 +148,13 @@ interface MapApi {
     @Operation(
         summary = "클러스터 내 사진 목록 조회",
         description = """
-            클러스터 ID를 기반으로 해당 그리드 셀 영역 내의 모든 사진을 조회합니다.
+            클러스터 ID에 해당하는 행정구역 안의 모든 사진을 조회합니다.
 
-            - clusterId는 GET /map/photos 응답에서 반환된 값을 사용
-            - clusterId 형식: z{zoom}_{cellX}_{cellY}[_g{n}][_mz{zoom*1000}] (예: z14_130234_38456_mz14700)
-            - 사진은 생성일시 기준 내림차순 정렬
-            - 페이지네이션 지원 (page, size 파라미터)
+            - clusterId는 GET /map/me 응답의 clusters[].clusterId 값을 사용
+            - clusterId 형식: sd_{시도 2자리} / sgg_{시군구 5자리} / emd_{읍면동 8자리} (예: sgg_41110)
+              - 시군구는 시 단위로 묶이므로 sgg_41110(수원시)은 장안구·권선구 등 일반구 사진을 모두 포함
+            - 전환기 동안 구 격자 형식 z{zoom}_{cellX}_{cellY}[_g{n}][_mz{zoom*1000}] 도 허용
+            - 사진은 촬영일시(takenAt) 내림차순, 같으면 ID 내림차순 정렬
         """,
     )
     @ApiResponses(
@@ -183,8 +184,8 @@ interface MapApi {
     fun getClusterPhotos(
         @Parameter(hidden = true) userId: Long,
         @Parameter(
-            description = "클러스터 ID (z{zoom}_{cellX}_{cellY}[_g{n}][_mz{zoom*1000}] 형식)",
-            example = "z14_130234_38456_mz14700",
+            description = "클러스터 ID (sd_{2자리} / sgg_{5자리} / emd_{8자리}, 전환기 동안 구 격자 형식도 허용)",
+            example = "sgg_41110",
             required = true,
         )
         @PathVariable clusterId: String,

@@ -98,6 +98,14 @@ class CacheConfig {
                         .build(),
                 ),
                 CaffeineCache(
+                    CacheNames.MAP_REGIONS,
+                    Caffeine
+                        .newBuilder()
+                        .expireAfterWrite(10, TimeUnit.MINUTES)
+                        .maximumSize(2_000)
+                        .build(),
+                ),
+                CaffeineCache(
                     CacheNames.PRESIGNED_URL,
                     Caffeine
                         .newBuilder()

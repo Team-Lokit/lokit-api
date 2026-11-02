@@ -28,6 +28,8 @@ import kr.co.lokit.api.domain.map.domain.MapPhotosReadModel
 import kr.co.lokit.api.domain.map.domain.MapZoom
 import kr.co.lokit.api.domain.map.domain.MercatorProjection
 import kr.co.lokit.api.domain.map.domain.PlaceSearchReadModel
+import kr.co.lokit.api.domain.map.domain.RegionClusterId
+import kr.co.lokit.api.domain.map.domain.RegionLevel
 import kr.co.lokit.api.domain.map.domain.ThumbnailUrls
 import kr.co.lokit.api.domain.user.domain.User
 import org.springframework.stereotype.Service
@@ -44,6 +46,7 @@ class MapQueryService(
     private val mapClientPort: MapClientPort,
     private val mapPhotosCacheService: MapPhotosCacheService,
     private val clusterBoundaryMergeStrategy: ClusterBoundaryMergeStrategy,
+    private val mapRegionClusterService: MapRegionClusterService,
 ) : GetMapUseCase,
     SearchLocationUseCase {
     private data class MapViewerContext(
@@ -60,31 +63,28 @@ class MapQueryService(
         zoom: Double,
         bbox: BBox,
         context: MapViewerContext,
-        lastDataVersion: Long?,
-        currentDataVersion: Long,
     ): MapPhotosReadModel {
         val boundedBbox = bbox.clampToKorea() ?: return emptyPhotosResponse(zoom)
         if (isMissingCoupleForAuthenticatedUser(context.userId, context.coupleId)) {
             return emptyPhotosResponse(zoom)
         }
-        val canReuseCellCache = lastDataVersion != null && lastDataVersion == currentDataVersion
-
-        return if (zoom < GridValues.CLUSTER_ZOOM_THRESHOLD.toDouble()) {
-            mapPhotosCacheService.getClusteredPhotos(
-                zoom = zoom,
-                bbox = boundedBbox,
-                coupleId = context.coupleId,
-                albumId = context.albumId,
-                canReuseCellCache = canReuseCellCache,
-            )
-        } else {
-            mapPhotosCacheService.getIndividualPhotos(
-                zoom = zoom,
-                bbox = boundedBbox,
-                coupleId = context.coupleId,
-                albumId = context.albumId,
-            )
-        }
+        val level =
+            RegionLevel.forZoom(zoom)
+                ?: return mapPhotosCacheService.getIndividualPhotos(
+                    zoom = zoom,
+                    bbox = boundedBbox,
+                    coupleId = context.coupleId,
+                    albumId = context.albumId,
+                )
+        return MapPhotosReadModel(
+            clusters =
+                mapRegionClusterService.getClusters(
+                    level = level,
+                    bbox = boundedBbox,
+                    coupleId = context.coupleId,
+                    albumId = context.albumId,
+                ),
+        )
     }
 
     @Transactional(readOnly = true)
@@ -95,6 +95,9 @@ class MapQueryService(
         val context = resolveViewerContext(userId = userId, albumId = null)
         if (isMissingCoupleForAuthenticatedUser(context.userId, context.coupleId)) {
             return ClusterPhotos.empty()
+        }
+        RegionClusterId.parse(clusterId)?.let { regionClusterId ->
+            return mapRegionClusterService.getClusterPhotos(regionClusterId, context.coupleId)
         }
         val parsedClusterId = ClusterId.parseDetailed(clusterId)
         val rawMergeZoom = parsedClusterId.mergeZoom ?: parsedClusterId.zoom.toDouble()
@@ -189,8 +192,6 @@ class MapQueryService(
                             zoom = mapZoom.level,
                             bbox = requestedBbox,
                             context = context,
-                            lastDataVersion = lastDataVersion,
-                            currentDataVersion = currentVersion,
                         )
                     },
                 )

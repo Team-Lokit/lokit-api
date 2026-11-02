@@ -75,6 +75,7 @@ private fun ClusterReadModel.toResponse(): ClusterResponse =
         longitude = longitude,
         latitude = latitude,
         takenAt = takenAt,
+        regionName = regionName,
     )
 
 private fun MapPhotoReadModel.toResponse(): MapPhotoResponse =

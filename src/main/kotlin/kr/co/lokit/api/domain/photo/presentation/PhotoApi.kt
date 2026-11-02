@@ -72,6 +72,10 @@ interface PhotoApi {
         description = "S3에 업로드된 사진 정보를 저장합니다.",
         responses = [
             ApiResponse(responseCode = "201", description = "사진 생성 성공"),
+            ApiResponse(
+                responseCode = "400",
+                description = "행정구역(읍·면·동)에 속하지 않는 좌표 (PHOTO_002, errors: longitude/latitude)",
+            ),
             ApiResponse(responseCode = "404", description = "앨범을 찾을 수 없음 (ALBUM_001)"),
         ],
     )
@@ -130,6 +134,11 @@ interface PhotoApi {
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "수정 성공"),
+            ApiResponse(
+                responseCode = "400",
+                description = "변경한 위치가 행정구역(읍·면·동)에 속하지 않음 (PHOTO_002, errors: longitude/latitude)",
+                content = [Content()],
+            ),
             ApiResponse(responseCode = "403", description = "수정 권한 없음", content = [Content()]),
             ApiResponse(responseCode = "404", description = "사진을 찾을 수 없음 (PHOTO_001)", content = [Content()]),
         ],

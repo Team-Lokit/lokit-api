@@ -5,9 +5,7 @@ import kr.co.lokit.api.domain.map.application.port.MapQueryPort
 import kr.co.lokit.api.domain.map.application.port.PhotoProjection
 import kr.co.lokit.api.infrastructure.exposed.schema.PhotoTable
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 
@@ -48,25 +46,6 @@ class ExposedMapQueryAdapter(
                 coupleId?.let { setLong(5, it) }
             }) { it.toClusterPhotoProjection() }
         }
-
-    private fun <T> executeQuery(
-        sql: String,
-        setup: PreparedStatement.() -> Unit,
-        mapper: (ResultSet) -> T,
-    ): List<T> {
-        val conn = TransactionManager.current().connection.connection as Connection
-
-        return conn.prepareStatement(sql).use { stmt ->
-            stmt.setup()
-            stmt.executeQuery().use { rs ->
-                val results = mutableListOf<T>()
-                while (rs.next()) {
-                    results.add(mapper(rs))
-                }
-                results
-            }
-        }
-    }
 
     private fun PreparedStatement.bindCommonParams(
         startIndex: Int,

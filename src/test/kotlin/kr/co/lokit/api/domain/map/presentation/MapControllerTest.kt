@@ -10,6 +10,7 @@ import kr.co.lokit.api.domain.map.application.port.`in`.SearchLocationUseCase
 import kr.co.lokit.api.domain.map.domain.AlbumMapInfoReadModel
 import kr.co.lokit.api.domain.map.domain.AlbumThumbnails
 import kr.co.lokit.api.domain.map.domain.BoundingBoxReadModel
+import kr.co.lokit.api.domain.map.domain.ClusterReadModel
 import kr.co.lokit.api.domain.map.domain.Clusters
 import kr.co.lokit.api.domain.map.domain.LocationInfoReadModel
 import kr.co.lokit.api.domain.map.domain.MapMeReadModel
@@ -32,6 +33,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @WebMvcTest(MapController::class)
@@ -145,6 +147,40 @@ class MapControllerTest {
             ).andExpect(status().isOk)
 
         verify(getMapUseCase).getMe(any(), eq(127.0), eq(37.5), eq(12.0), isNull(), isNull())
+    }
+
+    @Test
+    fun `지도 ME 응답의 클러스터에는 구역 이름이 포함된다`() {
+        doReturn(
+            createMapMeResponse().copy(
+                clusters =
+                    Clusters.of(
+                        listOf(
+                            ClusterReadModel(
+                                clusterId = "sgg_41110",
+                                count = 5,
+                                thumbnailUrl = "https://example.com/a.jpg",
+                                longitude = 127.01,
+                                latitude = 37.28,
+                                regionName = "수원시",
+                            ),
+                        ),
+                    ),
+            ),
+        ).`when`(getMapUseCase)
+            .getMe(any(), anyDouble(), anyDouble(), anyDouble(), isNull(), isNull())
+
+        mockMvc
+            .perform(
+                get("/map/me")
+                    .header("X-API-VERSION", "1.1")
+                    .with(authentication(userAuth()))
+                    .param("longitude", "127.0")
+                    .param("latitude", "37.5")
+                    .param("zoom", "10.0"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.clusters[0].clusterId").value("sgg_41110"))
+            .andExpect(jsonPath("$.data.clusters[0].regionName").value("수원시"))
     }
 
     @Test

@@ -22,6 +22,7 @@ fun Photo.toEntity(
         this.description = this@toEntity.description
         this.takenAt = this@toEntity.takenAt
         this.coupleId = album.couple.nonNullId()
+        this.regionCode = this@toEntity.regionCode
     }
 
 fun PhotoEntity.toDomain(): Photo =
@@ -35,6 +36,7 @@ fun PhotoEntity.toDomain(): Photo =
         uploadedById = uploadedById,
         takenAt = takenAt,
         address = address,
+        regionCode = regionCode,
     )
 
 fun PhotoEntity.toPhotoDetail(): PhotoDetail =

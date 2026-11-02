@@ -11,11 +11,11 @@ import java.time.LocalDateTime
 
 @Schema(description = "클러스터 응답")
 data class ClusterResponse(
-    @Schema(description = "클러스터 ID (줌/셀 + 선택적 그룹/병합줌 토큰)", example = "z14_130234_38456_mz14700")
+    @Schema(description = "클러스터 ID (행정구역: sd_{시도} / sgg_{시군구(시 단위)} / emd_{읍면동})", example = "sgg_41110")
     val clusterId: String,
     @Schema(description = "클러스터 내 사진 개수", example = "42")
     val count: Int,
-    @Schema(description = "대표 썸네일 URL (가장 최근 생성된 사진)", example = "https://example.com/photo.jpg")
+    @Schema(description = "대표 썸네일 URL (구역 내 가장 최근 촬영된 사진)", example = "https://example.com/photo.jpg")
     val thumbnailUrl: String,
     @field:NotNull
     @field:DecimalMin(value = "124.0", inclusive = true)
@@ -42,6 +42,12 @@ data class ClusterResponse(
     @field:JsonIgnore
     @Schema(hidden = true)
     val takenAt: LocalDateTime? = null,
+    @Schema(
+        description = "구역 이름 (시·도 / 시·군·구(시 단위) / 읍·면·동). 전환기 구 격자 클러스터는 null",
+        example = "수원시",
+        nullable = true,
+    )
+    val regionName: String? = null,
 )
 
 @Schema(description = "개별 사진 응답 (줌 >= 15)")

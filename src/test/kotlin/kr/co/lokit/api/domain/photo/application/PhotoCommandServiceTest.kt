@@ -4,6 +4,7 @@ import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.common.exception.ErrorField
 import kr.co.lokit.api.domain.album.application.CurrentCoupleAlbumResolver
 import kr.co.lokit.api.domain.map.application.MapPhotosCacheService
+import kr.co.lokit.api.domain.map.application.port.RegionResolverPort
 import kr.co.lokit.api.domain.map.application.port.`in`.SearchLocationUseCase
 import kr.co.lokit.api.domain.map.domain.LocationInfoReadModel
 import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
@@ -17,6 +18,7 @@ import kr.co.lokit.api.fixture.createPhoto
 import kr.co.lokit.api.fixture.createUpdatePhotoRequest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
@@ -26,9 +28,11 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.Mockito.doNothing
+import org.mockito.Mockito.lenient
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.argumentCaptor
@@ -60,11 +64,20 @@ class PhotoCommandServiceTest {
     @Mock
     lateinit var cacheManager: CacheManager
 
+    @Mock
+    lateinit var regionResolverPort: RegionResolverPort
+
     @InjectMocks
     lateinit var photoCommandService: PhotoCommandService
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> anyObject(): T = any<T>() as T
+
+    @BeforeEach
+    fun setUpRegionResolver() {
+        // 기본: 모든 좌표가 강남구 역삼1동에 속한다. 거부 시나리오는 테스트에서 특정 좌표를 null 로 재스텁한다.
+        lenient().`when`(regionResolverPort.resolveEupMyeonDongCode(anyDouble(), anyDouble())).thenReturn("11680101")
+    }
 
     @Test
     fun `사진을 생성할 수 있다`() {
@@ -144,25 +157,17 @@ class PhotoCommandServiceTest {
     }
 
     @Test
-    fun `위치가 없는 사진을 생성하면 이벤트를 발행하지 않는다`() {
+    fun `위치가 없는 (0,0) 사진도 행정구역 판정에서 거부된다`() {
+        // 상충 지점 #3 (A) 엄격 거부: (0,0) 은 위치 없음 센티넬로 판정을 건너뛰지 않는다.
+        // R33 과 달리 hasLocation()==false 를 이유로 판정을 생략하는 구현(Q1-B)을 막는다.
         val photo = createPhoto(albumId = 1L, location = createLocation(0.0, 0.0))
-        val savedPhoto =
-            createPhoto(
-                id = 42L,
-                albumId = 1L,
-                coupleId = 1L,
-                location = createLocation(0.0, 0.0),
-            )
-        doNothing().`when`(photoStoragePort).verifyFileExists(photo.url)
-        doNothing().`when`(currentCoupleAlbumResolver).validateAlbumBelongsToCurrentCouple(1L, 1L, ErrorField.UPLOADED_BY_ID)
-        `when`(mapQueryService.getLocationInfo(anyDouble(), anyDouble())).thenReturn(
-            LocationInfoReadModel(address = null, placeName = null, regionName = null),
-        )
-        `when`(photoRepository.save(anyObject())).thenReturn(savedPhoto)
+        `when`(regionResolverPort.resolveEupMyeonDongCode(0.0, 0.0)).thenReturn(null)
 
-        photoCommandService.create(photo)
-
-        verify(eventPublisher, never()).publishEvent(anyObject<Any>())
+        assertThrows<BusinessException.PhotoLocationOutOfRegionException> {
+            photoCommandService.create(photo)
+        }
+        verify(photoRepository, never()).save(anyObject())
+        verifyNoInteractions(photoStoragePort, eventPublisher, mapPhotosCacheService, cacheManager)
     }
 
     @Test
@@ -178,7 +183,7 @@ class PhotoCommandServiceTest {
 
     @Test
     fun `사진을 수정할 수 있다`() {
-        val request = createUpdatePhotoRequest(1L, 0.0, 0.0, description = "수정된 설명")
+        val request = createUpdatePhotoRequest(1L, 127.1, 37.6, description = "수정된 설명")
         val originalPhoto =
             createPhoto(id = 1L, albumId = 1L, coupleId = 1L, uploadedById = 1L, location = createLocation(127.0, 37.5))
         val updatedPhoto =
@@ -187,7 +192,7 @@ class PhotoCommandServiceTest {
                 albumId = 1L,
                 coupleId = 1L,
                 description = "수정된 설명",
-                location = createLocation(0.0, 0.0),
+                location = createLocation(127.1, 37.6),
                 uploadedById = 1L,
             )
         `when`(photoRepository.findById(1L)).thenReturn(originalPhoto)
@@ -350,5 +355,87 @@ class PhotoCommandServiceTest {
 
         verify(mapPhotosCacheService).evictForPhotoMutation(1L, 2L, 127.1, 37.6)
 //        verify(mockCache).evict(1L)
+    }
+
+    @Test
+    fun `행정구역에 속하지 않는 좌표로 사진을 생성하면 예외가 발생한다`() {
+        val photo = createPhoto(albumId = 1L, location = createLocation(130.0, 30.0))
+        `when`(regionResolverPort.resolveEupMyeonDongCode(130.0, 30.0)).thenReturn(null)
+
+        // fork 밖에서 던져야 하므로 ExecutionException 으로 감싸지지 않은 예외 그대로여야 한다(§0-4).
+        assertThrows<BusinessException.PhotoLocationOutOfRegionException> {
+            photoCommandService.create(photo)
+        }
+        verify(photoRepository, never()).save(anyObject())
+        verifyNoInteractions(photoStoragePort, eventPublisher, mapPhotosCacheService, cacheManager)
+    }
+
+    @Test
+    fun `사진을 생성하면 좌표의 읍면동 코드가 저장된다`() {
+        val photo = createPhoto(albumId = 1L, location = createLocation(126.98, 37.57))
+        val savedPhoto = createPhoto(id = 1L, albumId = 1L, coupleId = 1L, location = createLocation(126.98, 37.57))
+        `when`(regionResolverPort.resolveEupMyeonDongCode(126.98, 37.57)).thenReturn("11110101")
+        `when`(mapQueryService.getLocationInfo(anyDouble(), anyDouble())).thenReturn(
+            LocationInfoReadModel(address = "서울 종로구", placeName = null, regionName = "종로구"),
+        )
+        `when`(photoRepository.save(anyObject())).thenReturn(savedPhoto)
+
+        photoCommandService.create(photo)
+
+        val captor = argumentCaptor<kr.co.lokit.api.domain.photo.domain.Photo>()
+        verify(photoRepository).save(captor.capture())
+        assertEquals("11110101", captor.firstValue.regionCode)
+    }
+
+    @Test
+    fun `행정구역에 속하지 않는 좌표로 위치를 수정하면 예외가 발생하고 저장하지 않는다`() {
+        val originalPhoto =
+            createPhoto(id = 1L, albumId = 1L, coupleId = 1L, uploadedById = 1L, location = createLocation(127.0, 37.5))
+                .withRegionCode("11680101")
+        `when`(photoRepository.findById(1L)).thenReturn(originalPhoto)
+        `when`(regionResolverPort.resolveEupMyeonDongCode(130.0, 30.0)).thenReturn(null)
+
+        assertThrows<BusinessException.PhotoLocationOutOfRegionException> {
+            photoCommandService.update(1L, 1L, null, 130.0, 30.0, 1L)
+        }
+        verify(photoRepository, never()).update(anyObject())
+        verifyNoInteractions(eventPublisher, mapPhotosCacheService, cacheManager)
+    }
+
+    @Test
+    fun `위치를 수정하면 병합된 좌표로 지역 코드를 재배정한다`() {
+        val originalPhoto =
+            createPhoto(id = 1L, albumId = 1L, coupleId = 1L, uploadedById = 1L, location = createLocation(127.0, 37.5))
+                .withRegionCode("11680101")
+        val updatedPhoto =
+            createPhoto(id = 1L, albumId = 1L, coupleId = 1L, uploadedById = 1L, location = createLocation(128.0, 37.5))
+        `when`(photoRepository.findById(1L)).thenReturn(originalPhoto)
+        `when`(regionResolverPort.resolveEupMyeonDongCode(128.0, 37.5)).thenReturn("42150101")
+        `when`(photoRepository.update(anyObject())).thenReturn(updatedPhoto)
+
+        photoCommandService.update(1L, 1L, null, 128.0, null, 1L)
+
+        verify(regionResolverPort).resolveEupMyeonDongCode(128.0, 37.5)
+        val captor = argumentCaptor<kr.co.lokit.api.domain.photo.domain.Photo>()
+        verify(photoRepository).update(captor.capture())
+        assertEquals("42150101", captor.firstValue.regionCode)
+    }
+
+    @Test
+    fun `위치를 바꾸지 않는 수정은 지역을 다시 판정하지 않는다`() {
+        val originalPhoto =
+            createPhoto(id = 1L, albumId = 1L, coupleId = 1L, uploadedById = 1L, location = createLocation(127.0, 37.5))
+                .withRegionCode("11680101")
+        val updatedPhoto =
+            createPhoto(id = 1L, albumId = 1L, coupleId = 1L, uploadedById = 1L, description = "설명만 수정")
+        `when`(photoRepository.findById(1L)).thenReturn(originalPhoto)
+        `when`(photoRepository.update(anyObject())).thenReturn(updatedPhoto)
+
+        photoCommandService.update(1L, 1L, "설명만 수정", null, null, 1L)
+
+        verify(regionResolverPort, never()).resolveEupMyeonDongCode(anyDouble(), anyDouble())
+        val captor = argumentCaptor<kr.co.lokit.api.domain.photo.domain.Photo>()
+        verify(photoRepository).update(captor.capture())
+        assertEquals("11680101", captor.firstValue.regionCode)
     }
 }
