@@ -9,6 +9,7 @@ import kr.co.lokit.api.domain.photo.dto.CreatePhotoRequest
 import kr.co.lokit.api.domain.photo.dto.LocationResponse
 import kr.co.lokit.api.domain.photo.dto.PhotoListResponse
 import kr.co.lokit.api.domain.photo.dto.PhotoResponse
+import java.time.LocalDateTime
 
 fun CreatePhotoRequest.toDomain(userId: Long): Photo =
     Photo(
@@ -17,8 +18,8 @@ fun CreatePhotoRequest.toDomain(userId: Long): Photo =
         description = description,
         uploadedById = userId,
         url = url,
-        takenAt = takenAt,
-)
+        takenAt = takenAt ?: LocalDateTime.now(),
+    )
 
 fun Photo.toResponse(viewerUserId: Long): PhotoResponse =
     PhotoResponse(
