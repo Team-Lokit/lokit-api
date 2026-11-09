@@ -19,9 +19,11 @@ import kr.co.lokit.api.domain.map.dto.HomeResponse
 import kr.co.lokit.api.domain.map.dto.LegacyMapMeResponse
 import kr.co.lokit.api.domain.map.dto.LocationInfoResponse
 import kr.co.lokit.api.domain.map.dto.MapMeResponse
+import kr.co.lokit.api.domain.map.dto.MapMeV2Response
 import kr.co.lokit.api.domain.map.dto.MapPhotoResponse
 import kr.co.lokit.api.domain.map.dto.PlaceResponse
 import kr.co.lokit.api.domain.map.dto.PlaceSearchResponse
+import kr.co.lokit.api.domain.map.dto.RegionClusterResponse
 
 fun MapMeReadModel.toLegacyResponse(): LegacyMapMeResponse =
     LegacyMapMeResponse(
@@ -41,6 +43,18 @@ fun MapMeReadModel.toResponse(): MapMeResponse =
         albums = albums.asList().map { it.toResponse() },
         dataVersion = dataVersion,
         clusters = clusters?.asList()?.map { it.toResponse() },
+        photos = photos?.asList()?.map { it.toResponse() },
+        profileImageUrl = profileImageUrl,
+        userId = userId,
+    )
+
+fun MapMeReadModel.toV2Response(): MapMeV2Response =
+    MapMeV2Response(
+        boundingBox = boundingBox.toResponse(),
+        totalHistoryCount = totalHistoryCount,
+        albums = albums.asList().map { it.toResponse() },
+        dataVersion = dataVersion,
+        clusters = clusters?.asList()?.map { it.toRegionClusterResponse() },
         photos = photos?.asList()?.map { it.toResponse() },
         profileImageUrl = profileImageUrl,
         userId = userId,
@@ -75,7 +89,16 @@ private fun ClusterReadModel.toResponse(): ClusterResponse =
         longitude = longitude,
         latitude = latitude,
         takenAt = takenAt,
-        regionName = regionName,
+    )
+
+private fun ClusterReadModel.toRegionClusterResponse(): RegionClusterResponse =
+    RegionClusterResponse(
+        clusterId = clusterId,
+        regionName = requireNotNull(regionName) { "Region cluster must have regionName: $clusterId" },
+        count = count,
+        thumbnailUrl = thumbnailUrl,
+        longitude = longitude,
+        latitude = latitude,
     )
 
 private fun MapPhotoReadModel.toResponse(): MapPhotoResponse =

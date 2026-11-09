@@ -9,9 +9,11 @@ import kr.co.lokit.api.domain.map.dto.ClusterPhotoResponse
 import kr.co.lokit.api.domain.map.dto.LegacyMapMeResponse
 import kr.co.lokit.api.domain.map.dto.LocationInfoResponse
 import kr.co.lokit.api.domain.map.dto.MapMeResponse
+import kr.co.lokit.api.domain.map.dto.MapMeV2Response
 import kr.co.lokit.api.domain.map.dto.PlaceSearchResponse
 import kr.co.lokit.api.domain.map.presentation.mapping.toLegacyResponse
 import kr.co.lokit.api.domain.map.presentation.mapping.toResponse
+import kr.co.lokit.api.domain.map.presentation.mapping.toV2Response
 import kr.co.lokit.api.domain.user.domain.User
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
@@ -64,6 +66,15 @@ class MapController(
                 albumId,
                 lastDataVersion,
             ).toResponse()
+
+    @GetMapping("me", version = "2.0")
+    override fun getMeV2(
+        @CurrentUser user: User,
+        @RequestParam longitude: Double,
+        @RequestParam latitude: Double,
+        @RequestParam zoom: Double,
+        @RequestParam(required = false) albumId: Long?,
+    ): MapMeV2Response = getMapUseCase.getMeV2(user, longitude, latitude, zoom, albumId).toV2Response()
 
     @GetMapping("clusters/{clusterId}/photos")
     override fun getClusterPhotos(

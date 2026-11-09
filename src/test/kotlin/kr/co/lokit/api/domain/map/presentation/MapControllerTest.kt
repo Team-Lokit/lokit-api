@@ -23,7 +23,9 @@ import org.mockito.ArgumentMatchers.anyDouble
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doReturn
+import org.mockito.Mockito.never
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
 import org.mockito.kotlin.verify
@@ -75,6 +77,23 @@ class MapControllerTest {
             photos = null,
             profileImageUrl = "https://example.com/profile.jpg",
             userId = 1L,
+        )
+
+    private fun createMapMeResponseWithRegionCluster(): MapMeReadModel =
+        createMapMeResponse().copy(
+            clusters =
+                Clusters.of(
+                    listOf(
+                        ClusterReadModel(
+                            clusterId = "sgg_41110",
+                            count = 5,
+                            thumbnailUrl = "https://example.com/a.jpg",
+                            longitude = 127.01,
+                            latitude = 37.28,
+                            regionName = "수원시",
+                        ),
+                    ),
+                ),
         )
 
     @Test
@@ -150,24 +169,31 @@ class MapControllerTest {
     }
 
     @Test
-    fun `지도 ME 응답의 클러스터에는 구역 이름이 포함된다`() {
-        doReturn(
-            createMapMeResponse().copy(
-                clusters =
-                    Clusters.of(
-                        listOf(
-                            ClusterReadModel(
-                                clusterId = "sgg_41110",
-                                count = 5,
-                                thumbnailUrl = "https://example.com/a.jpg",
-                                longitude = 127.01,
-                                latitude = 37.28,
-                                regionName = "수원시",
-                            ),
-                        ),
-                    ),
-            ),
-        ).`when`(getMapUseCase)
+    fun `X-API-VERSION이 2_0이면 구역 이름이 포함된 지역 클러스터를 반환한다`() {
+        doReturn(createMapMeResponseWithRegionCluster())
+            .`when`(getMapUseCase)
+            .getMeV2(any(), anyDouble(), anyDouble(), anyDouble(), isNull())
+
+        mockMvc
+            .perform(
+                get("/map/me")
+                    .header("X-API-VERSION", "2.0")
+                    .with(authentication(userAuth()))
+                    .param("longitude", "127.0")
+                    .param("latitude", "37.5")
+                    .param("zoom", "10.0"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.clusters[0].clusterId").value("sgg_41110"))
+            .andExpect(jsonPath("$.data.clusters[0].regionName").value("수원시"))
+
+        verify(getMapUseCase).getMeV2(any(), eq(127.0), eq(37.5), eq(10.0), isNull())
+        verify(getMapUseCase, never()).getMe(any(), anyDouble(), anyDouble(), anyDouble(), anyOrNull(), anyOrNull())
+    }
+
+    @Test
+    fun `X-API-VERSION이 1_1이면 기존 응답을 유지하고 구역 이름을 내보내지 않는다`() {
+        doReturn(createMapMeResponseWithRegionCluster())
+            .`when`(getMapUseCase)
             .getMe(any(), anyDouble(), anyDouble(), anyDouble(), isNull(), isNull())
 
         mockMvc
@@ -179,8 +205,10 @@ class MapControllerTest {
                     .param("latitude", "37.5")
                     .param("zoom", "10.0"),
             ).andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.clusters[0].clusterId").value("sgg_41110"))
-            .andExpect(jsonPath("$.data.clusters[0].regionName").value("수원시"))
+            .andExpect(jsonPath("$.data.clusters[0].clusterId").exists())
+            .andExpect(jsonPath("$.data.clusters[0].regionName").doesNotExist())
+
+        verify(getMapUseCase, never()).getMeV2(any(), anyDouble(), anyDouble(), anyDouble(), anyOrNull())
     }
 
     @Test

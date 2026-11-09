@@ -59,7 +59,38 @@ class MapQueryService(
         const val GRID_ZOOM_STEPS = 2.0
     }
 
-    private fun getPhotos(
+    private fun getGridPhotos(
+        zoom: Double,
+        bbox: BBox,
+        context: MapViewerContext,
+        lastDataVersion: Long?,
+        currentDataVersion: Long,
+    ): MapPhotosReadModel {
+        val boundedBbox = bbox.clampToKorea() ?: return emptyPhotosResponse(zoom)
+        if (isMissingCoupleForAuthenticatedUser(context.userId, context.coupleId)) {
+            return emptyPhotosResponse(zoom)
+        }
+        val canReuseCellCache = lastDataVersion != null && lastDataVersion == currentDataVersion
+
+        return if (zoom < GridValues.CLUSTER_ZOOM_THRESHOLD.toDouble()) {
+            mapPhotosCacheService.getClusteredPhotos(
+                zoom = zoom,
+                bbox = boundedBbox,
+                coupleId = context.coupleId,
+                albumId = context.albumId,
+                canReuseCellCache = canReuseCellCache,
+            )
+        } else {
+            mapPhotosCacheService.getIndividualPhotos(
+                zoom = zoom,
+                bbox = boundedBbox,
+                coupleId = context.coupleId,
+                albumId = context.albumId,
+            )
+        }
+    }
+
+    private fun getRegionPhotos(
         zoom: Double,
         bbox: BBox,
         context: MapViewerContext,
@@ -167,6 +198,29 @@ class MapQueryService(
         zoom: Double,
         albumId: Long?,
         lastDataVersion: Long?,
+    ): MapMeReadModel =
+        loadMe(user, longitude, latitude, zoom, albumId) { level, bbox, context, currentVersion ->
+            getGridPhotos(level, bbox, context, lastDataVersion, currentVersion)
+        }
+
+    override fun getMeV2(
+        user: User,
+        longitude: Double,
+        latitude: Double,
+        zoom: Double,
+        albumId: Long?,
+    ): MapMeReadModel =
+        loadMe(user, longitude, latitude, zoom, albumId) { level, bbox, context, _ ->
+            getRegionPhotos(level, bbox, context)
+        }
+
+    private fun loadMe(
+        user: User,
+        longitude: Double,
+        latitude: Double,
+        zoom: Double,
+        albumId: Long?,
+        loadPhotos: (zoom: Double, bbox: BBox, context: MapViewerContext, currentVersion: Long) -> MapPhotosReadModel,
     ): MapMeReadModel {
         val mapZoom = MapZoom.from(zoom)
         val requestedBbox = BBox.fromCenter(mapZoom.level, longitude, latitude)
@@ -188,11 +242,7 @@ class MapQueryService(
                         findAlbumsForCouple(context.coupleId)
                     },
                     scope.fork {
-                        getPhotos(
-                            zoom = mapZoom.level,
-                            bbox = requestedBbox,
-                            context = context,
-                        )
+                        loadPhotos(mapZoom.level, requestedBbox, context, currentVersion)
                     },
                 )
             }

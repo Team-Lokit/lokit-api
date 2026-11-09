@@ -214,8 +214,10 @@ class MapServiceTest {
         val currentVersion = 7L
         `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
         `when`(albumRepository.findById(defaultAlbumId)).thenReturn(createAlbum(id = defaultAlbumId, isDefault = true))
-        `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), isNull())).thenReturn(currentVersion)
-        `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), anyOrNull())).thenReturn(Clusters.empty())
+        `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), anyOrNull())).thenReturn(currentVersion)
+        `when`(mapPhotosCacheService.getClusteredPhotos(any(), any(), eq(1L), anyOrNull(), any())).thenReturn(
+            MapPhotosReadModel(clusters = Clusters.empty()),
+        )
         `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
 
@@ -230,12 +232,37 @@ class MapServiceTest {
             )
 
         assertEquals(currentVersion, result.dataVersion)
+        verify(mapPhotosCacheService).getDataVersion(any(), any(), eq(1L), anyOrNull())
+        verify(mapPhotosCacheService).getClusteredPhotos(any(), any(), eq(1L), anyOrNull(), eq(true))
+    }
+
+    @Test
+    fun `getMeV2의 기본 앨범 요청은 정규화된 albumId를 사용한다`() {
+        val defaultAlbumId = 10L
+        val currentVersion = 7L
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(albumRepository.findById(defaultAlbumId)).thenReturn(createAlbum(id = defaultAlbumId, isDefault = true))
+        `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), isNull())).thenReturn(currentVersion)
+        `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), anyOrNull())).thenReturn(Clusters.empty())
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        val result =
+            mapService.getMeV2(
+                user = createUser(id = 1L),
+                longitude = 127.0,
+                latitude = 37.5,
+                zoom = 14.0,
+                albumId = defaultAlbumId,
+            )
+
+        assertEquals(currentVersion, result.dataVersion)
         verify(mapPhotosCacheService).getDataVersion(any(), any(), eq(1L), isNull())
         verify(mapRegionClusterService).getClusters(eq(RegionLevel.EUPMYEONDONG), any(), eq(1L), isNull())
     }
 
     @Test
-    fun `getMe는 줌 15 미만에서 지역 클러스터를 반환한다`() {
+    fun `getMeV2는 줌 15 미만에서 지역 클러스터를 반환한다`() {
         val regionClusters =
             Clusters.of(
                 listOf(
@@ -256,13 +283,12 @@ class MapServiceTest {
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
 
         val result =
-            mapService.getMe(
+            mapService.getMeV2(
                 user = createUser(id = 1L),
                 longitude = 127.0,
                 latitude = 37.5,
                 zoom = 10.0,
                 albumId = null,
-                lastDataVersion = null,
             )
 
         verify(mapRegionClusterService).getClusters(eq(RegionLevel.SIGUNGU), any(), eq(1L), anyOrNull())
@@ -271,9 +297,32 @@ class MapServiceTest {
     }
 
     @Test
-    fun `getMe는 양자화하지 않은 원본 줌으로 지역 레벨을 정한다`() {
+    fun `getMeV2는 양자화하지 않은 원본 줌으로 지역 레벨을 정한다`() {
         `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
         `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), anyOrNull())).thenReturn(Clusters.empty())
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        mapService.getMeV2(
+            user = createUser(id = 1L),
+            longitude = 127.0,
+            latitude = 37.5,
+            zoom = 7.75,
+            albumId = null,
+        )
+
+        verify(mapRegionClusterService).getClusters(eq(RegionLevel.SIDO), any(), eq(1L), anyOrNull())
+    }
+
+    @Test
+    fun `lastDataVersion이 다르면 셀 캐시 재사용 없이 전체 셀을 재조회한다`() {
+        val currentVersion = 9L
+        val staleVersion = 8L
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), anyOrNull())).thenReturn(currentVersion)
+        `when`(mapPhotosCacheService.getClusteredPhotos(any(), any(), eq(1L), anyOrNull(), any())).thenReturn(
+            MapPhotosReadModel(clusters = Clusters.empty()),
+        )
         `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
 
@@ -281,37 +330,13 @@ class MapServiceTest {
             user = createUser(id = 1L),
             longitude = 127.0,
             latitude = 37.5,
-            zoom = 7.75,
+            zoom = 14.0,
             albumId = null,
-            lastDataVersion = null,
+            lastDataVersion = staleVersion,
         )
 
-        verify(mapRegionClusterService).getClusters(eq(RegionLevel.SIDO), any(), eq(1L), anyOrNull())
-    }
-
-    @Test
-    fun `지역 경로는 lastDataVersion이 달라도 격자 셀 캐시 경로를 쓰지 않는다`() {
-        val currentVersion = 9L
-        val staleVersion = 8L
-        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
-        `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), anyOrNull())).thenReturn(currentVersion)
-        `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), anyOrNull())).thenReturn(Clusters.empty())
-        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
-        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
-
-        val result =
-            mapService.getMe(
-                user = createUser(id = 1L),
-                longitude = 127.0,
-                latitude = 37.5,
-                zoom = 14.0,
-                albumId = null,
-                lastDataVersion = staleVersion,
-            )
-
-        assertEquals(currentVersion, result.dataVersion)
-        verify(mapRegionClusterService).getClusters(eq(RegionLevel.EUPMYEONDONG), any(), eq(1L), anyOrNull())
-        verify(mapPhotosCacheService, never()).getClusteredPhotos(any(), any(), anyOrNull(), anyOrNull(), any())
+        verify(mapPhotosCacheService).getClusteredPhotos(any(), any(), eq(1L), anyOrNull(), eq(false))
+        verifyNoInteractions(mapRegionClusterService)
     }
 
     @Test
@@ -371,7 +396,9 @@ class MapServiceTest {
         `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
         `when`(albumRepository.findById(albumId)).thenReturn(createAlbum(id = albumId, isDefault = false))
         `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), eq(albumId))).thenReturn(10L)
-        `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), eq(albumId))).thenReturn(Clusters.empty())
+        `when`(mapPhotosCacheService.getClusteredPhotos(any(), any(), eq(1L), eq(albumId), any())).thenReturn(
+            MapPhotosReadModel(clusters = Clusters.empty()),
+        )
         `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
         `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
 
@@ -385,7 +412,70 @@ class MapServiceTest {
         )
 
         verify(mapPhotosCacheService).getDataVersion(any(), any(), eq(1L), eq(albumId))
+        verify(mapPhotosCacheService).getClusteredPhotos(any(), any(), eq(1L), eq(albumId), any())
+    }
+
+    @Test
+    fun `getMeV2의 비기본 앨범 요청은 albumId를 유지한다`() {
+        val albumId = 22L
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(albumRepository.findById(albumId)).thenReturn(createAlbum(id = albumId, isDefault = false))
+        `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), eq(albumId))).thenReturn(10L)
+        `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), eq(albumId))).thenReturn(Clusters.empty())
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        mapService.getMeV2(
+            user = createUser(id = 1L),
+            longitude = 127.0,
+            latitude = 37.5,
+            zoom = 14.0,
+            albumId = albumId,
+        )
+
+        verify(mapPhotosCacheService).getDataVersion(any(), any(), eq(1L), eq(albumId))
         verify(mapRegionClusterService).getClusters(eq(RegionLevel.EUPMYEONDONG), any(), eq(1L), eq(albumId))
+    }
+
+    @Test
+    fun `getMeV2는 줌 15 이상에서 개별 사진을 반환한다`() {
+        val photos = MapPhotosReadModel(photos = MapPhotos.empty())
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(mapPhotosCacheService.getIndividualPhotos(any(), any(), eq(1L), anyOrNull())).thenReturn(photos)
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        val result =
+            mapService.getMeV2(
+                user = createUser(id = 1L),
+                longitude = 127.0,
+                latitude = 37.5,
+                zoom = 15.0,
+                albumId = null,
+            )
+
+        assertNotNull(result.photos)
+        assertNull(result.clusters)
+        verifyNoInteractions(mapRegionClusterService)
+    }
+
+    @Test
+    fun `연결되지 않은 유저의 getMeV2는 빈 클러스터를 반환한다`() {
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(null)
+        `when`(mapPhotosCacheService.getDataVersion(any(), any(), anyOrNull(), anyOrNull())).thenReturn(0L)
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        val result =
+            mapService.getMeV2(
+                user = createUser(id = 1L),
+                longitude = 127.0,
+                latitude = 37.5,
+                zoom = 14.0,
+                albumId = null,
+            )
+
+        assertTrue(result.clusters!!.isEmpty())
+        verifyNoInteractions(mapRegionClusterService)
     }
 
     @Test
