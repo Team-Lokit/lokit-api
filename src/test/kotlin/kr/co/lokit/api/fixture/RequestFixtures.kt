@@ -21,7 +21,7 @@ fun createPhotoRequest(
     albumId: Long = 1L,
     longitude: Double = 127.0,
     latitude: Double = 37.5,
-    takenAt: LocalDateTime = LocalDateTime.of(2025, 1, 1, 12, 0),
+    takenAt: LocalDateTime? = LocalDateTime.of(2025, 1, 1, 12, 0),
     description: String? = null,
 ) = CreatePhotoRequest(
     url = url,

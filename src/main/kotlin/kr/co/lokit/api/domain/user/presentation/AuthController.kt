@@ -13,6 +13,7 @@ import kr.co.lokit.api.domain.user.application.OAuthLoginServiceRegistry
 import kr.co.lokit.api.domain.user.application.port.OAuthProvider
 import kr.co.lokit.api.domain.user.dto.LogoutRequest
 import kr.co.lokit.api.domain.user.infrastructure.oauth.apple.AppleOAuthProperties
+import kr.co.lokit.api.domain.user.infrastructure.oauth.apple.AppleUserNameParser
 import kr.co.lokit.api.domain.user.infrastructure.oauth.kakao.KakaoOAuthProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -82,7 +83,7 @@ class AuthController(
                 "?client_id=${appleOAuthProperties.clientId}" +
                 "&redirect_uri=${appleOAuthProperties.redirectUri}" +
                 "&response_type=code" +
-                "&scope=email" +
+                "&scope=name%20email" +
                 "&response_mode=form_post" +
                 "&state=$state"
 
@@ -146,6 +147,7 @@ class AuthController(
     override fun appleCallback(
         @RequestParam code: String,
         @RequestParam(required = false) state: String?,
+        @RequestParam(required = false) user: String?,
         req: HttpServletRequest,
     ): ResponseEntity<Unit> {
         val redirectUri =
@@ -157,7 +159,7 @@ class AuthController(
 
         return try {
             val service = loginServiceRegistry.getService(OAuthProvider.APPLE)
-            val loginResult = service.login(code)
+            val loginResult = service.login(code, AppleUserNameParser.parse(user))
             val accessTokenCookie = cookieGenerator.createAccessTokenCookie(req, loginResult.tokens.accessToken)
             val refreshTokenCookie = cookieGenerator.createRefreshTokenCookie(req, loginResult.tokens.refreshToken)
             log.info(

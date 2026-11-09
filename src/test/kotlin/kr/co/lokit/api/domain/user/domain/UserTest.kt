@@ -46,4 +46,25 @@ class UserTest {
     fun `이메일 로컬파트가 비어있으면 기본 닉네임을 사용한다`() {
         assertEquals("사용자", User.defaultNicknameFor("@example.com"))
     }
+
+    @Test
+    fun `이름이 있으면 이름을 기본 닉네임으로 사용한다`() {
+        assertEquals("김승진", User.defaultNickname("  김승진 ", "lokit_user@example.com"))
+    }
+
+    @Test
+    fun `이름이 없거나 공백이면 이메일로 기본 닉네임을 만든다`() {
+        assertEquals("lokit_user", User.defaultNickname(null, "lokit_user@example.com"))
+        assertEquals("lokit_user", User.defaultNickname("   ", "lokit_user@example.com"))
+    }
+
+    @Test
+    fun `이름은 닉네임 최대 길이로 자르고 잘린 끝의 공백을 제거한다`() {
+        assertEquals("Johnathan", User.defaultNickname("Johnathan Smith", "a@b.com"))
+    }
+
+    @Test
+    fun `이름을 자를 때 이모지를 반으로 쪼개지 않는다`() {
+        assertEquals("가나다라마바사아자", User.defaultNickname("가나다라마바사아자😀", "a@b.com"))
+    }
 }

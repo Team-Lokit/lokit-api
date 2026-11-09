@@ -10,4 +10,5 @@ class KakaoOAuthUserInfo(
     override val provider: OAuthProvider = OAuthProvider.KAKAO
     override val providerId: String = response.id.toString()
     override val email: String? = response.kakaoAccount?.email
+    override val name: String? = response.kakaoAccount?.name ?: response.kakaoAccount?.profile?.nickname
 }

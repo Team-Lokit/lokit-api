@@ -95,6 +95,20 @@ class PhotoControllerTest {
     }
 
     @Test
+    fun `촬영 시각 없이도 사진을 생성할 수 있다`() {
+        doReturn(createPhoto(id = 1L)).`when`(createPhotoUseCase).create(anyObject())
+
+        mockMvc.perform(
+            post("/photos")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"url":"https://example.com/photo.jpg","albumId":1,"longitude":127.0,"latitude":37.5}"""),
+        )
+            .andExpect(status().isCreated)
+    }
+
+    @Test
     fun `사진 상세 조회 성공`() {
         val response = PhotoDetailReadModel(
             id = 1L,

@@ -69,11 +69,11 @@ data class CreatePhotoRequest(
     @Schema(description = "사진 위도", example = "37.4979", requiredMode = Schema.RequiredMode.REQUIRED)
     val latitude: Double,
     @Schema(
-        description = "촬영일시 (EXIF 데이터)",
+        description = "촬영일시 (EXIF 데이터). 확인할 수 없으면 null 로 보내며, 서버가 업로드 시각으로 저장한다.",
         example = "2026-01-06T14:30:00",
-        requiredMode = Schema.RequiredMode.REQUIRED,
+        nullable = true,
     )
-    val takenAt: LocalDateTime,
+    val takenAt: LocalDateTime? = null,
     @Schema(description = "사진 설명", example = "가족 여행 사진")
     val description: String? = null,
 )

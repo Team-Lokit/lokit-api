@@ -33,7 +33,10 @@ class AppleLoginService(
         get() = OAuthProvider.APPLE
 
     @Transactional
-    override fun login(code: String): LoginResult {
+    override fun login(
+        code: String,
+        providedName: String?,
+    ): LoginResult {
         val client = oAuthClientRegistry.getClient(provider)
         val idToken = client.getAccessToken(code)
         val userInfo = client.getUserInfo(idToken)
@@ -49,7 +52,7 @@ class AppleLoginService(
             lockManager.withLock(key = User.emailLockKey(email), operation = {
                 val (loadedUser, isNew) = userRepository.findByEmail(email)
                     ?.let { it to false }
-                    ?: (userRepository.save(User(email = email, name = User.defaultNicknameFor(email))) to true)
+                    ?: (userRepository.save(User(email = email, name = User.defaultNickname(providedName ?: userInfo.name, email))) to true)
                 val recovered = reactivateIfNeeded(loadedUser)
                 createCoupleUseCase.createIfNone(Couple(name = Couple.DEFAULT_COUPLE_NAME), loadedUser.id)
                 LoginLoadResult(user = loadedUser.recoveredIf(recovered), recovered = recovered, isNew = isNew)
