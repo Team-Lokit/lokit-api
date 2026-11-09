@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 
 interface CalendarPhotoJpaRepository : Repository<PhotoEntity, Long> {
     @Query(
-        "SELECT new kr.co.lokit.api.domain.calendar.domain.CalendarPhoto(p.id, p.url, p.takenAt)" +
+        "SELECT new kr.co.lokit.api.domain.calendar.domain.CalendarPhoto(p.id, p.url, p.takenAt, p.address)" +
             " FROM Photo p" +
             " WHERE p.coupleId = :coupleId AND p.takenAt >= :from AND p.takenAt < :toExclusive" +
             " ORDER BY p.takenAt DESC, p.id DESC",

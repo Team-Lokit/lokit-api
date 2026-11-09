@@ -7,6 +7,7 @@ data class CalendarPhoto(
     val id: Long,
     val url: String,
     val takenAt: LocalDateTime,
+    val address: String,
 ) {
     companion object {
         /** 기준 시각 최신순, 같으면 id 내림차순. 월간 대표 사진과 날짜별 목록의 첫 장이 항상 일치하도록 한 곳에서 정의한다. */

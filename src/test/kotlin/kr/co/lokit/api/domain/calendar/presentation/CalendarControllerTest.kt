@@ -59,7 +59,7 @@ class CalendarControllerTest {
                     listOf(
                         CalendarDay(
                             date = LocalDate.of(2026, 11, 2),
-                            representativePhoto = CalendarPhoto(812L, "https://example.com/812.jpg", LocalDateTime.of(2026, 11, 2, 21, 10)),
+                            representativePhoto = CalendarPhoto(812L, "https://example.com/812.jpg", LocalDateTime.of(2026, 11, 2, 21, 10), "테헤란로"),
                             anniversaries = emptyList(),
                         ),
                         CalendarDay(
@@ -80,6 +80,7 @@ class CalendarControllerTest {
             .andExpect(jsonPath("$.data.days[0].representativePhoto.id").value(812))
             .andExpect(jsonPath("$.data.days[0].representativePhoto.url").value("https://example.com/812.jpg"))
             .andExpect(jsonPath("$.data.days[0].representativePhoto.takenAt").value("2026-11-02T21:10:00"))
+            .andExpect(jsonPath("$.data.days[0].representativePhoto.address").doesNotExist())
             .andExpect(jsonPath("$.data.days[0].photoCount").doesNotExist())
             .andExpect(jsonPath("$.data.days[0].anniversaries").isEmpty)
             .andExpect(jsonPath("$.data.days[1].representativePhoto").isEmpty)
@@ -107,8 +108,8 @@ class CalendarControllerTest {
         val date = LocalDate.of(2026, 11, 2)
         whenever(getCalendarUseCase.getDayPhotos(1L, date)).thenReturn(
             listOf(
-                CalendarPhoto(812L, "https://example.com/812.jpg", LocalDateTime.of(2026, 11, 2, 21, 10)),
-                CalendarPhoto(700L, "https://example.com/700.jpg", LocalDateTime.of(2026, 11, 2, 9, 0)),
+                CalendarPhoto(812L, "https://example.com/812.jpg", LocalDateTime.of(2026, 11, 2, 21, 10), "테헤란로"),
+                CalendarPhoto(700L, "https://example.com/700.jpg", LocalDateTime.of(2026, 11, 2, 9, 0), "성수이로"),
             ),
         )
 
@@ -117,7 +118,9 @@ class CalendarControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.date").value("2026-11-02"))
             .andExpect(jsonPath("$.data.photos[0].id").value(812))
+            .andExpect(jsonPath("$.data.photos[0].address").value("테헤란로"))
             .andExpect(jsonPath("$.data.photos[1].id").value(700))
+            .andExpect(jsonPath("$.data.photos[1].address").value("성수이로"))
     }
 
     @Test

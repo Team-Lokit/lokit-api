@@ -42,7 +42,7 @@ class CalendarQueryServiceTest {
     private fun photo(
         id: Long,
         takenAt: LocalDateTime,
-    ) = CalendarPhoto(id, "https://example.com/$id.jpg", takenAt)
+    ) = CalendarPhoto(id, "https://example.com/$id.jpg", takenAt, "테헤란로")
 
     @Test
     fun `월간 조회는 해당 월 1일부터 다음 달 1일 전까지의 커플 사진으로 대표 사진을 만든다`() {
