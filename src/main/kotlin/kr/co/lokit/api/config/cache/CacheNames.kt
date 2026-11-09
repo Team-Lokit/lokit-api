@@ -13,6 +13,7 @@ object CacheNames {
     const val COUPLE_ALBUMS = "coupleAlbums"
     const val MAP_PHOTOS = "mapPhotos"
     const val MAP_CELLS = "mapCells"
+    const val MAP_REGIONS = "mapRegions"
     const val PRESIGNED_URL = "presignedUrl"
 }
 

@@ -2,6 +2,7 @@ package kr.co.lokit.api.domain.map.application
 
 import kr.co.lokit.api.domain.map.domain.BBox
 import kr.co.lokit.api.domain.map.domain.GridValues
+import kr.co.lokit.api.domain.map.domain.RegionLevel
 import kr.co.lokit.api.common.util.orZero
 
 object MapCacheKeyFactory {
@@ -76,6 +77,14 @@ object MapCacheKeyFactory {
             coupleId,
         )}_a${normalizeId(albumId)}_v$version"
     }
+
+    @JvmStatic
+    fun buildRegionKey(
+        level: RegionLevel,
+        coupleId: Long?,
+        albumId: Long?,
+        version: Long,
+    ): String = "rg_${level.clusterIdPrefix}_c${normalizeId(coupleId)}_a${normalizeId(albumId)}_v$version"
 
     fun parseCellKey(key: String): ParsedCellKey? {
         val match = CELL_KEY_REGEX.matchEntire(key) ?: return null

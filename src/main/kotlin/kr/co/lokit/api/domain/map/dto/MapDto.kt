@@ -44,6 +44,22 @@ data class ClusterResponse(
     val takenAt: LocalDateTime? = null,
 )
 
+@Schema(description = "행정구역 클러스터 응답 (v2)")
+data class RegionClusterResponse(
+    @Schema(description = "클러스터 ID (sd_{시도 2자리} / sgg_{시군구 5자리, 시 단위} / emd_{읍면동 8자리})", example = "sgg_41110")
+    val clusterId: String,
+    @Schema(description = "구역 이름 (시·도 / 시·군·구(시 단위) / 읍·면·동)", example = "수원시")
+    val regionName: String,
+    @Schema(description = "구역 내 사진 개수", example = "42")
+    val count: Int,
+    @Schema(description = "대표 썸네일 URL (구역 내 가장 최근 촬영된 사진)", example = "https://example.com/photo.jpg")
+    val thumbnailUrl: String,
+    @Schema(description = "구역 대표점 경도", example = "127.0276")
+    val longitude: Double,
+    @Schema(description = "구역 대표점 위도", example = "37.4979")
+    val latitude: Double,
+)
+
 @Schema(description = "개별 사진 응답 (줌 >= 15)")
 data class MapPhotoResponse(
     @Schema(description = "사진 ID", example = "1")
@@ -284,6 +300,26 @@ data class MapMeResponse(
     val dataVersion: Long = 0,
     @Schema(description = "클러스터 목록 (줌 < 15일 때)")
     val clusters: List<ClusterResponse>? = null,
+    @Schema(description = "개별 사진 목록 (줌 >= 15일 때)")
+    val photos: List<MapPhotoResponse>? = null,
+    @Schema(description = "내 프로필 이미지 URL", example = "https://example.com/profile.jpg")
+    val profileImageUrl: String?,
+    @Schema(description = "내 회원 ID", example = "1")
+    val userId: Long,
+)
+
+@Schema(description = "지도 ME 응답 v2 (행정구역 클러스터)")
+data class MapMeV2Response(
+    @Schema(description = "바운딩 박스")
+    val boundingBox: BoundingBoxResponse,
+    @Schema(description = "기록 수(전체 보기 사진 개수)")
+    val totalHistoryCount: Int,
+    @Schema(description = "앨범 하이라이트 사진들 (최대 4장)")
+    val albums: List<HomeResponse.Companion.AlbumThumbnails>,
+    @Schema(description = "데이터 버전 (사진 변경 시 증가, 프론트 캐싱에 사용)")
+    val dataVersion: Long = 0,
+    @Schema(description = "행정구역 클러스터 목록 (줌 < 15일 때)")
+    val clusters: List<RegionClusterResponse>? = null,
     @Schema(description = "개별 사진 목록 (줌 >= 15일 때)")
     val photos: List<MapPhotoResponse>? = null,
     @Schema(description = "내 프로필 이미지 URL", example = "https://example.com/profile.jpg")

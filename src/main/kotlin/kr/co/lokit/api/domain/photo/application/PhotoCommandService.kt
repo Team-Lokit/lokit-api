@@ -2,12 +2,15 @@ package kr.co.lokit.api.domain.photo.application
 
 import kr.co.lokit.api.common.annotation.OptimisticRetry
 import kr.co.lokit.api.common.concurrency.StructuredConcurrency
+import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.common.exception.ErrorField
+import kr.co.lokit.api.common.exception.errorDetailsOf
 import kr.co.lokit.api.config.cache.CacheNames
 import kr.co.lokit.api.config.cache.CacheRegion
 import kr.co.lokit.api.config.cache.evictKey
 import kr.co.lokit.api.domain.album.application.CurrentCoupleAlbumResolver
 import kr.co.lokit.api.domain.map.application.MapPhotosCacheService
+import kr.co.lokit.api.domain.map.application.port.RegionResolverPort
 import kr.co.lokit.api.domain.map.application.port.`in`.SearchLocationUseCase
 import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.PhotoStoragePort
@@ -36,6 +39,7 @@ class PhotoCommandService(
     private val eventPublisher: ApplicationEventPublisher,
     private val mapPhotosCacheService: MapPhotosCacheService,
     private val cacheManager: CacheManager,
+    private val regionResolverPort: RegionResolverPort,
 ) : CreatePhotoUseCase,
     UpdatePhotoUseCase {
     @Cacheable(
@@ -57,6 +61,7 @@ class PhotoCommandService(
     @OptimisticRetry
     @Transactional
     override fun create(photo: Photo): Photo {
+        val regionCode = resolveRegionCodeOrThrow(photo.location.longitude, photo.location.latitude)
         val (_, locationFuture, defaultAlbumFuture) =
             StructuredConcurrency.run { scope ->
                 Triple(
@@ -82,7 +87,11 @@ class PhotoCommandService(
 
         val locationInfo = locationFuture.get()
         val defaultAlbum = defaultAlbumFuture.get()
-        val effectivePhoto = photo.withAddress(locationInfo.address).withDefaultAlbum(defaultAlbum?.id)
+        val effectivePhoto =
+            photo
+                .withAddress(locationInfo.address)
+                .withDefaultAlbum(defaultAlbum?.id)
+                .withRegionCode(regionCode)
         val saved = photoRepository.save(effectivePhoto)
 
         publishPhotoCreatedEventIfNeeded(saved)
@@ -117,7 +126,10 @@ class PhotoCommandService(
                 )
                 albumId
             }
-        val updated = photo.update(effectiveAlbumId, description, longitude, latitude)
+        val updated =
+            photo
+                .update(effectiveAlbumId, description, longitude, latitude)
+                .withRegionCodeResolvedIfLocationChanged(longitude, latitude)
         val result = photoRepository.update(updated)
 
         publishPhotoLocationUpdatedEventIfNeeded(updated, result.coupleId)
@@ -188,6 +200,25 @@ class PhotoCommandService(
             latitude = photo.location.latitude,
         )
     }
+
+    private fun Photo.withRegionCodeResolvedIfLocationChanged(
+        longitude: Double?,
+        latitude: Double?,
+    ): Photo =
+        if (longitude != null || latitude != null) {
+            withRegionCode(resolveRegionCodeOrThrow(location.longitude, location.latitude))
+        } else {
+            this
+        }
+
+    private fun resolveRegionCodeOrThrow(
+        longitude: Double,
+        latitude: Double,
+    ): String =
+        regionResolverPort.resolveEupMyeonDongCode(longitude, latitude)
+            ?: throw BusinessException.PhotoLocationOutOfRegionException(
+                errors = errorDetailsOf(ErrorField.LONGITUDE to longitude, ErrorField.LATITUDE to latitude),
+            )
 
     private fun Long?.isPositiveId(): Boolean = this != null && this > 0L
 }

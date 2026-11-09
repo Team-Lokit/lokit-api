@@ -14,10 +14,27 @@ import kr.co.lokit.api.domain.map.dto.ClusterPhotoResponse
 import kr.co.lokit.api.domain.map.dto.LegacyMapMeResponse
 import kr.co.lokit.api.domain.map.dto.LocationInfoResponse
 import kr.co.lokit.api.domain.map.dto.MapMeResponse
+import kr.co.lokit.api.domain.map.dto.MapMeV2Response
 import kr.co.lokit.api.domain.map.dto.PlaceSearchResponse
 import kr.co.lokit.api.domain.user.domain.User
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestParam
+
+// springdoc 은 같은 경로·메서드의 버전별 핸들러를 한 오퍼레이션으로 합치므로, 어느 쪽 설명이 남아도 같도록 공유한다.
+private const val MAP_ME_SUMMARY = "지도 ME 조회 (홈 + 사진 조회 통합)"
+private const val MAP_ME_DESCRIPTION = """
+    홈 정보와 지도 사진을 한 번에 조회합니다.
+
+    - 위치 정보, 앨범 목록, 바운딩 박스 (map/home 응답)
+    - 줌 레벨과 바운딩 박스 기반 사진/클러스터 (map/photos 응답)
+    - 두 API를 하나로 통합하여 네트워크 요청을 줄입니다.
+    - v1.0.0은 Deprecated 상태인 기본 버전이며, X-API-VERSION 헤더 없이 호출 가능합니다.
+    - v1.1 응답 형식을 사용하려면 X-API-VERSION=1.1 헤더가 필요합니다. 클러스터는 격자 기반입니다.
+    - 행정구역 클러스터(MapMeV2Response)를 사용하려면 X-API-VERSION=2.0 헤더가 필요합니다.
+      - 줌 < 8: 시·도 / 8 <= 줌 < 12: 시·군·구(일반구는 시 단위) / 12 <= 줌 < 15: 읍·면·동(법정동)
+      - 구역마다 가장 최근 사진 1장과 구역 이름(regionName)을 반환합니다.
+      - 줌 >= 15: 개별 사진 (clusters 는 null, photos 반환)
+"""
 
 @SecurityRequirement(name = "Authorization")
 @Tag(name = "Map", description = "지도 API")
@@ -80,17 +97,8 @@ interface MapApi {
 
     @Operation(
         operationId = "getMapMeV1_1",
-        summary = "지도 ME 조회 (v1.1, 홈 + 사진 조회 통합)",
-        description = """
-            홈 정보와 지도 사진을 한 번에 조회합니다.
-
-            - 위치 정보, 앨범 목록, 바운딩 박스 (map/home 응답)
-            - 줌 레벨과 바운딩 박스 기반 사진/클러스터 (map/photos 응답)
-            - 두 API를 하나로 통합하여 네트워크 요청을 줄입니다.
-            - v1.0.0은 Deprecated 상태인 기본 버전이며, X-API-VERSION 헤더 없이 호출 가능합니다.
-            - v1.1 응답 형식을 사용하려면 X-API-VERSION=1.1 헤더가 필요합니다.
-            - v1.1 응답 형식을 사용합니다.
-        """,
+        summary = MAP_ME_SUMMARY,
+        description = MAP_ME_DESCRIPTION,
     )
     @ApiResponses(
         value = [
@@ -146,14 +154,55 @@ interface MapApi {
     ): MapMeResponse
 
     @Operation(
+        operationId = "getMapMeV2",
+        summary = MAP_ME_SUMMARY,
+        description = MAP_ME_DESCRIPTION,
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "조회 성공",
+                content = [Content(schema = Schema(implementation = MapMeV2Response::class))],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "잘못된 요청 파라미터",
+                content = [Content()],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "인증 필요",
+                content = [Content()],
+            ),
+        ],
+    )
+    fun getMeV2(
+        @Parameter(hidden = true) user: User,
+        @Parameter(description = "경도", example = "127.0276", required = true)
+        @RequestParam longitude: Double,
+        @Parameter(description = "위도", example = "37.4979", required = true)
+        @RequestParam latitude: Double,
+        @Parameter(
+            description = "줌 레벨(소수점 지원). 15 미만이면 행정구역 클러스터, 15 이상이면 개별 사진 반환",
+            example = "10.5",
+            required = true,
+        )
+        @RequestParam zoom: Double,
+        @Parameter(description = "앨범 ID (선택). 지정 시 해당 앨범의 사진만 조회", example = "1", required = false)
+        @RequestParam albumId: Long?,
+    ): MapMeV2Response
+
+    @Operation(
         summary = "클러스터 내 사진 목록 조회",
         description = """
-            클러스터 ID를 기반으로 해당 그리드 셀 영역 내의 모든 사진을 조회합니다.
+            클러스터 ID에 해당하는 사진을 조회합니다.
 
-            - clusterId는 GET /map/photos 응답에서 반환된 값을 사용
-            - clusterId 형식: z{zoom}_{cellX}_{cellY}[_g{n}][_mz{zoom*1000}] (예: z14_130234_38456_mz14700)
-            - 사진은 생성일시 기준 내림차순 정렬
-            - 페이지네이션 지원 (page, size 파라미터)
+            - clusterId는 GET /map/me 응답의 clusters[].clusterId 값을 사용
+            - v2 응답의 행정구역 형식: sd_{시도 2자리} / sgg_{시군구 5자리} / emd_{읍면동 8자리} (예: sgg_41110)
+              - 시군구는 시 단위로 묶이므로 sgg_41110(수원시)은 장안구·권선구 등 일반구 사진을 모두 포함
+            - v1.x 응답의 격자 형식: z{zoom}_{cellX}_{cellY}[_g{n}][_mz{zoom*1000}] (예: z14_130234_38456_mz14700)
+            - 사진은 촬영일시(takenAt) 내림차순, 같으면 ID 내림차순 정렬
         """,
     )
     @ApiResponses(
@@ -183,8 +232,8 @@ interface MapApi {
     fun getClusterPhotos(
         @Parameter(hidden = true) userId: Long,
         @Parameter(
-            description = "클러스터 ID (z{zoom}_{cellX}_{cellY}[_g{n}][_mz{zoom*1000}] 형식)",
-            example = "z14_130234_38456_mz14700",
+            description = "클러스터 ID (v2: sd_{2자리} / sgg_{5자리} / emd_{8자리}, v1.x: z{zoom}_{cellX}_{cellY}[_g{n}][_mz{zoom*1000}])",
+            example = "sgg_41110",
             required = true,
         )
         @PathVariable clusterId: String,

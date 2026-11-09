@@ -1,6 +1,7 @@
 package kr.co.lokit.api.domain.map.application
 
 import kr.co.lokit.api.domain.map.domain.BBox
+import kr.co.lokit.api.domain.map.domain.RegionLevel
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -53,5 +54,12 @@ class MapCacheKeyFactoryTest {
         val key = MapCacheKeyFactory.buildRequestStateKey(15, 7L, null)
 
         assertEquals("z15_c7_a0", key)
+    }
+
+    @Test
+    fun `지역 집계 캐시 키는 레벨·커플·앨범·버전을 포함한다`() {
+        val key = MapCacheKeyFactory.buildRegionKey(RegionLevel.SIGUNGU, 1L, null, 3L)
+
+        assertEquals("rg_sgg_c1_a0_v3", key)
     }
 }

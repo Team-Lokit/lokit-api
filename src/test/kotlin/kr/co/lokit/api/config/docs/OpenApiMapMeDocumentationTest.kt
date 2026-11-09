@@ -27,7 +27,7 @@ class OpenApiMapMeDocumentationTest {
     private val objectMapper: ObjectMapper = ObjectMapper()
 
     @Test
-    fun `map me 문서는 v1_1 기준으로 단일 노출되고 기본 버전 안내를 포함한다`() {
+    fun `map me 문서는 v1_1과 v2를 한 경로에 노출하고 버전 안내를 포함한다`() {
         val openApiJson = fetchOpenApiJson()
         val openApi = objectMapper.readTree(openApiJson)
         writeOpenApiArtifact(openApiJson)
@@ -42,13 +42,20 @@ class OpenApiMapMeDocumentationTest {
             mapMeGet["parameters"]
                 .firstOrNull { it["name"].asText() == "X-API-VERSION" && it["in"].asText() == "header" }
         assertNotNull(versionHeader)
-        assertEquals("1.1", versionHeader["schema"]["enum"][0].asText())
+        val versions = versionHeader["schema"]["enum"].map { it.asText() }
+        assertTrue(versions.containsAll(listOf("1.1", "2.0")))
         assertEquals("1.0.0", versionHeader["schema"]["default"].asText())
 
         val description = mapMeGet["description"].asText()
         assertTrue(description.contains("v1.0.0은 Deprecated 상태인 기본 버전"))
         assertTrue(description.contains("헤더 없이 호출 가능합니다"))
         assertTrue(description.contains("X-API-VERSION=1.1"))
+        assertTrue(description.contains("X-API-VERSION=2.0"))
+
+        val responseSchemas =
+            mapMeGet["responses"]["200"]["content"].first()["schema"]["oneOf"].map { it["\$ref"].asText() }
+        assertTrue(responseSchemas.any { it.endsWith("/MapMeResponse") })
+        assertTrue(responseSchemas.any { it.endsWith("/MapMeV2Response") })
     }
 
     private fun fetchOpenApiJson(): String {

@@ -157,6 +157,12 @@ sealed class BusinessException(
         errors: Map<String, String> = emptyMap(),
     ) : BusinessException(ErrorCode.DEFAULT_ALBUM_NOT_FOUND_FOR_USER, message, cause, errors)
 
+    class PhotoLocationOutOfRegionException(
+        message: String = ErrorCode.PHOTO_LOCATION_OUT_OF_REGION.message,
+        cause: Throwable? = null,
+        errors: Map<String, String> = emptyMap(),
+    ) : BusinessException(ErrorCode.PHOTO_LOCATION_OUT_OF_REGION, message, cause, errors)
+
     class AlbumAlreadyExistsException(
         message: String = ErrorCode.ALBUM_ALREADY_EXISTS.message,
         cause: Throwable? = null,

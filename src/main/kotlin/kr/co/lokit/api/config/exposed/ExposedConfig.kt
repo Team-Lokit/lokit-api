@@ -2,6 +2,7 @@ package kr.co.lokit.api.config.exposed
 
 import kr.co.lokit.api.domain.map.application.port.MapQueryPort
 import kr.co.lokit.api.domain.map.infrastructure.ExposedMapQueryAdapter
+import kr.co.lokit.api.domain.map.infrastructure.ExposedRegionAdapter
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.transactions.TransactionManager
@@ -35,4 +36,7 @@ class ExposedConfig {
 
     @Bean
     fun mapQueryPort(database: Database): MapQueryPort = ExposedMapQueryAdapter(database)
+
+    @Bean
+    fun exposedRegionAdapter(database: Database): ExposedRegionAdapter = ExposedRegionAdapter(database)
 }

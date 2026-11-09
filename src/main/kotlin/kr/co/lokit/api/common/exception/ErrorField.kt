@@ -19,6 +19,8 @@ object ErrorField {
     const val PROVIDER_ID = "providerId"
     const val UPLOADED_BY_ID = "uploadedById"
     const val LOCK_KEY = "lockKey"
+    const val LONGITUDE = "longitude"
+    const val LATITUDE = "latitude"
 }
 
 fun errorDetailsOf(vararg pairs: Pair<String, Any?>): Map<String, String> =

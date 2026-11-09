@@ -57,6 +57,9 @@ class PhotoEntity(
     @Column(name = "couple_id")
     var coupleId: Long? = null
 
+    @Column(name = "region_code", length = 8)
+    var regionCode: String? = null
+
     @Column(length = 1000)
     var description: String? = null
 
@@ -79,6 +82,7 @@ class PhotoEntity(
         this.description = photo.description
         this.coupleId = album.couple.nonNullId()
         this.address = photo.address ?: this.address
+        this.regionCode = photo.regionCode ?: this.regionCode
         this.takenAt = photo.takenAt
         updateLocation(photo.location.longitude, photo.location.latitude)
     }

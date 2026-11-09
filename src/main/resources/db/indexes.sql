@@ -38,3 +38,4 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_notif_id ON notificatio
 -- EXISTS 쿼리가 recipient_user_id로 이 인덱스만 찍고 바로 멈춘다(전체 스캔 없이 O(1)에 가깝다).
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notification_recipient_unread ON notification (recipient_user_id) WHERE is_read = false AND is_deleted = false;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_photo_couple_taken_at_desc_active ON photo (couple_id, taken_at DESC, id DESC) WHERE is_deleted = false;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_photo_couple_region_active ON photo (couple_id, region_code) WHERE is_deleted = false;

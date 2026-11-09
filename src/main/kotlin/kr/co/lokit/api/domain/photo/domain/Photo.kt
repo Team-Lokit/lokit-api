@@ -12,12 +12,15 @@ data class Photo(
     var uploadedById: Long,
     var takenAt: LocalDateTime = LocalDateTime.now(),
     val address: String? = null,
+    val regionCode: String? = null,
 ) {
     fun hasLocation(): Boolean = location.longitude != 0.0 && location.latitude != 0.0
 
     fun canEvictMapCache(): Boolean = coupleId != null && hasLocation()
 
     fun canPublishLocationEvent(coupleId: Long?): Boolean = hasLocation() && coupleId != null && albumId != null
+
+    fun withRegionCode(regionCode: String): Photo = copy(regionCode = regionCode)
 
     fun withAddress(address: String?): Photo = copy(address = address)
 
