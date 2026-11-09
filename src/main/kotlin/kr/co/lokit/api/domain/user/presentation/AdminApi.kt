@@ -26,8 +26,12 @@ interface AdminApi {
     fun getUsers(key: String): List<AdminUserSummaryResponse>
 
     @Operation(
-        summary = "이메일 기준 사용자 데이터 전체 삭제",
-        description = "사용자와 연결된 커플/앨범/사진/토큰 데이터를 함께 삭제합니다.",
+        summary = "이메일 기준 사용자 데이터 물리 삭제",
+        description =
+            "사용자와 현재 커플의 앨범/사진/댓글, 토큰, 알림 데이터를 DB와 S3에서 **복구할 수 없게** 삭제합니다.\n\n" +
+                "- 소프트 삭제된 행도 함께 삭제됩니다.\n" +
+                "- 파트너의 사진도 현재 커플에 속해 있으면 함께 삭제되며, 파트너 계정은 남습니다.\n" +
+                "- 다른 활성 멤버가 남아 있는 과거 커플의 데이터는 유지됩니다.",
         responses = [
             ApiResponse(responseCode = "200", description = "삭제 성공"),
             ApiResponse(responseCode = "403", description = "관리자 키 불일치"),

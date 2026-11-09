@@ -1,5 +1,6 @@
 package kr.co.lokit.api.domain.user.presentation
 
+import kr.co.lokit.api.domain.user.application.port.`in`.HardDeleteUserUseCase
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.config.security.JwtTokenProvider
 import kr.co.lokit.api.domain.couple.application.CoupleCommandService
@@ -19,6 +20,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.cache.CacheManager
 import org.springframework.mock.web.MockHttpServletRequest
 import java.time.LocalDateTime
 import java.util.Optional
@@ -34,6 +36,8 @@ class AdminControllerTest {
     private val coupleInviteUseCase: CoupleInviteUseCase = mock()
     private val coupleRepository: CoupleRepositoryPort = mock()
     private val jwtTokenProvider: JwtTokenProvider = mock()
+    private val cacheManager: CacheManager = mock()
+    private val hardDeleteUserUseCase: HardDeleteUserUseCase = mock()
 
     private val controller =
         AdminController(
@@ -42,15 +46,14 @@ class AdminControllerTest {
             coupleInviteUseCase = coupleInviteUseCase,
             refreshTokenRepository = mock(),
             coupleJpaRepository = mock(),
-            albumJpaRepository = mock(),
-            albumBoundsJpaRepository = mock(),
             coupleRepository = coupleRepository,
             albumRepository = mock(),
             photoRepository = mock(),
             commentRepository = mock(),
             emoticonRepository = mock(),
             jwtTokenProvider = jwtTokenProvider,
-            cacheManager = mock(),
+            cacheManager = cacheManager,
+            hardDeleteUserUseCase = hardDeleteUserUseCase,
             adminKey = "admin",
         )
 
@@ -65,6 +68,23 @@ class AdminControllerTest {
         whenever(jwtTokenProvider.generateAccessToken(any())).thenReturn("access")
         whenever(jwtTokenProvider.generateRefreshToken()).thenReturn("refresh")
         whenever(jwtTokenProvider.getRefreshTokenExpirationMillis()).thenReturn(60_000L)
+    }
+
+    @Test
+    fun `사용자 삭제는 물리 삭제 유스케이스를 호출한다`() {
+        whenever(cacheManager.cacheNames).thenReturn(emptyList())
+
+        val response = controller.deleteAllByEmail("me@test.com", "admin")
+
+        verify(hardDeleteUserUseCase).hardDeleteByEmail("me@test.com")
+        assertEquals("삭제 완료: me@test.com", response.message)
+    }
+
+    @Test
+    fun `관리자 키가 틀리면 사용자를 삭제하지 않는다`() {
+        assertThrows<BusinessException.ForbiddenException> { controller.deleteAllByEmail("me@test.com", "wrong") }
+
+        verify(hardDeleteUserUseCase, never()).hardDeleteByEmail(any())
     }
 
     @Test
