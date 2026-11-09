@@ -4,4 +4,5 @@ interface OAuthUserInfo {
     val provider: OAuthProvider
     val providerId: String
     val email: String?
+    val name: String?
 }

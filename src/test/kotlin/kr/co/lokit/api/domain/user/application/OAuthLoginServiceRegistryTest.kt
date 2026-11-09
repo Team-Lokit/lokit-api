@@ -10,7 +10,7 @@ class OAuthLoginServiceRegistryTest {
     private class FakeLoginService(
         override val provider: OAuthProvider,
     ) : LoginService {
-        override fun login(code: String): LoginResult = throw UnsupportedOperationException("not used in registry test")
+        override fun login(code: String, providedName: String?): LoginResult = throw UnsupportedOperationException("not used in registry test")
     }
 
     @Test

@@ -25,6 +25,23 @@ data class User(
 
         fun emailLockKey(email: String): String = "$EMAIL_LOCK_KEY_PREFIX$email"
 
+        /** 소셜 계정의 이름을 우선 쓰고, 없으면 이메일로 만든다. */
+        fun defaultNickname(
+            name: String?,
+            email: String,
+        ): String =
+            name
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.truncateToNicknameLength()
+                ?: defaultNicknameFor(email)
+
+        private fun String.truncateToNicknameLength(): String {
+            val truncated = take(MAX_NICKNAME_LENGTH)
+            // 이모지 같은 서로게이트 쌍이 경계에서 잘리면 깨진 문자가 저장되므로 앞쪽 절반도 버린다.
+            return (if (truncated.last().isHighSurrogate()) truncated.dropLast(1) else truncated).trimEnd()
+        }
+
         fun defaultNicknameFor(email: String): String =
             email
                 .substringBefore("@")
