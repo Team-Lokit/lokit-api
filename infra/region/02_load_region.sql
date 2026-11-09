@@ -26,8 +26,9 @@ JOIN (SELECT LEFT(code, 2) AS code, ST_Union(geom) AS geom FROM tmp_emd GROUP BY
   ON u.code = s.code;
 
 -- 3) 일반구를 가진 "시" 행 (예: 41111 수원시 장안구 -> 41110 수원시)
---    시군구 코드의 5번째 자리가 0이 아니면 일반구로 보고, 앞 4자리 + '0' 을 시 코드로 한다.
---    SHP 에 시 행이 있으면 그 이름을, 없으면 일반구 이름의 첫 토큰("수원시 장안구" -> "수원시")을 쓴다.
+--    이름이 '...시...구' 형태면 일반구로 보고, 앞 4자리 + '0' 을 시 코드로 한다.
+--    코드 끝자리로는 판별할 수 없다: 11215 광진구, 28177 미추홀구, 43745 증평군처럼 끝자리가 0이 아닌 자치구·군이 있다.
+--    SHP 에 시 행이 있으면 그 이름을, 없으면 일반구 이름의 시 부분("수원시장안구" -> "수원시")을 쓴다.
 --    center/envelope 은 하위 읍면동 union 으로 계산한다.
 INSERT INTO region (code, level, name, parent_code, center, west, south, east, north, geom)
 SELECT c.code, 2,
@@ -35,9 +36,9 @@ SELECT c.code, 2,
        LEFT(c.code, 2),
        ST_PointOnSurface(u.geom), ST_XMin(u.geom), ST_YMin(u.geom), ST_XMax(u.geom), ST_YMax(u.geom), NULL
 FROM (
-    SELECT LEFT(sig_cd, 4) || '0' AS code, MIN(split_part(name, ' ', 1)) AS fallback_name
+    SELECT LEFT(sig_cd, 4) || '0' AS code, MIN(substring(name from '^(.+?시).+구$')) AS fallback_name
     FROM stg_sigungu
-    WHERE RIGHT(LEFT(sig_cd, 5), 1) <> '0'
+    WHERE name ~ '^.+시.+구$'
     GROUP BY LEFT(sig_cd, 4)
 ) c
 JOIN (SELECT LEFT(code, 4) || '0' AS code, ST_Union(geom) AS geom
@@ -46,10 +47,10 @@ JOIN (SELECT LEFT(code, 4) || '0' AS code, ST_Union(geom) AS geom
   ON u.code = c.code;
 
 -- 4) 나머지 시군구 (일반구, 자치구, 군, 일반구 없는 시). 3) 에서 넣은 시 코드는 건너뛴다.
---    일반구(5번째 자리 <> '0')의 parent 는 3) 에서 만든 시, 나머지는 시도.
+--    일반구('...시...구')의 parent 는 3) 에서 만든 시, 나머지는 시도.
 INSERT INTO region (code, level, name, parent_code, center, west, south, east, north, geom)
 SELECT g.code, 2, g.name,
-       CASE WHEN RIGHT(g.code, 1) <> '0' THEN LEFT(g.code, 4) || '0' ELSE LEFT(g.code, 2) END,
+       CASE WHEN g.name ~ '^.+시.+구$' THEN LEFT(g.code, 4) || '0' ELSE LEFT(g.code, 2) END,
        ST_PointOnSurface(u.geom), ST_XMin(u.geom), ST_YMin(u.geom), ST_XMax(u.geom), ST_YMax(u.geom), NULL
 FROM (SELECT LEFT(sig_cd, 5) AS code, MIN(name) AS name FROM stg_sigungu GROUP BY LEFT(sig_cd, 5)) g
 JOIN (SELECT LEFT(code, 5) AS code, ST_Union(geom) AS geom FROM tmp_emd GROUP BY LEFT(code, 5)) u
@@ -65,7 +66,7 @@ FROM tmp_emd e;
 COMMIT;
 
 -- 6) 검증 (모두 기대값이 나와야 한다)
-SELECT level, count(*) FROM region GROUP BY level ORDER BY level;          -- 1: 17, 2: 약 250+, 3: 약 5,000
+SELECT level, count(*) FROM region GROUP BY level ORDER BY level;          -- 2026-10 기준 1: 16, 2: 시군구 SHP 행 수 + 일반구를 가진 시 수
 SELECT count(*) AS orphan FROM region c                                    -- 0
 WHERE c.parent_code IS NOT NULL AND NOT EXISTS (SELECT 1 FROM region p WHERE p.code = c.parent_code);
 SELECT code, name, parent_code FROM region WHERE code IN ('11680', '41110', '41111', '36110');

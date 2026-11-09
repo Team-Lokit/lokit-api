@@ -4,8 +4,8 @@
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 
--- 법정 행정구역 기준 테이블 (JPA 엔티티 아님. Exposed raw SQL 로만 읽는다)
---   level 1 = 시도(코드 2자리), 2 = 시군구(5자리, 일반구 + 일반구를 가진 시 포함), 3 = 읍면동(8자리, 법정동코드 앞 8자리)
+-- 행정구역 기준 테이블 (JPA 엔티티 아님. Exposed raw SQL 로만 읽는다)
+--   level 1 = 시도(코드 2자리), 2 = 시군구(5자리, 일반구 + 일반구를 가진 시 포함), 3 = 읍면동(8자리, 행정동코드 adm_cd2 앞 8자리)
 --   parent_code: 읍면동 -> 원본 시군구(일반구 포함), 일반구 -> 시, 시/자치구/군 -> 시도, 시도 -> NULL
 --   center: 마커 대표점 (ST_PointOnSurface, 항상 구역 내부)
 --   west/south/east/north: 구역 envelope (지도 bbox 교차 판정용)
