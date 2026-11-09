@@ -5,6 +5,7 @@ import kr.co.lokit.api.domain.calendar.domain.CalendarDay
 import kr.co.lokit.api.domain.calendar.domain.CalendarMonth
 import kr.co.lokit.api.domain.calendar.domain.CalendarPhoto
 import kr.co.lokit.api.domain.calendar.dto.AnniversaryResponse
+import kr.co.lokit.api.domain.calendar.dto.CalendarDayPhotoResponse
 import kr.co.lokit.api.domain.calendar.dto.CalendarDayPhotosResponse
 import kr.co.lokit.api.domain.calendar.dto.CalendarDayResponse
 import kr.co.lokit.api.domain.calendar.dto.CalendarMonthResponse
@@ -29,4 +30,7 @@ fun CalendarPhoto.toResponse(): CalendarPhotoResponse = CalendarPhotoResponse(id
 fun Anniversary.toResponse(): AnniversaryResponse = AnniversaryResponse(type = type, value = value)
 
 fun List<CalendarPhoto>.toDayPhotosResponse(date: LocalDate): CalendarDayPhotosResponse =
-    CalendarDayPhotosResponse(date = date, photos = map { it.toResponse() })
+    CalendarDayPhotosResponse(
+        date = date,
+        photos = map { CalendarDayPhotoResponse(id = it.id, url = it.url, takenAt = it.takenAt, address = it.address) },
+    )

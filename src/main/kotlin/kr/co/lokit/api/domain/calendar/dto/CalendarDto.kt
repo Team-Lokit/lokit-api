@@ -47,5 +47,17 @@ data class CalendarDayPhotosResponse(
     @Schema(description = "날짜", example = "2026-11-02")
     val date: LocalDate,
     @Schema(description = "기준 시각 최신순 사진 목록. 첫 번째 사진이 월간 캘린더의 대표 사진과 같다.")
-    val photos: List<CalendarPhotoResponse>,
+    val photos: List<CalendarDayPhotoResponse>,
+)
+
+@Schema(description = "날짜별 사진")
+data class CalendarDayPhotoResponse(
+    @Schema(description = "사진 ID", example = "812")
+    val id: Long,
+    @Schema(description = "사진 URL", example = "https://bucket.s3.amazonaws.com/photos/1/image.jpg")
+    val url: String,
+    @Schema(description = "기준 시각 (촬영 시각, 없으면 업로드 시각)", example = "2026-11-02T21:10:00")
+    val takenAt: LocalDateTime,
+    @Schema(description = "사진 등록 시 저장된 주소", example = "테헤란로")
+    val address: String,
 )

@@ -140,7 +140,7 @@ class CalendarPhotoQueryAdapterTest {
     }
 
     @Test
-    fun `사진의 url과 기준 시각을 함께 조회한다`() {
+    fun `사진의 url과 기준 시각, 주소를 함께 조회한다`() {
         val takenAt = LocalDateTime.of(2026, 11, 7, 18, 30)
         val id = savePhoto(takenAt)
         flushAndClear()
@@ -150,5 +150,6 @@ class CalendarPhotoQueryAdapterTest {
         assertEquals(id, photo.id)
         assertEquals("https://example.com/photo-$seq.jpg", photo.url)
         assertEquals(takenAt, photo.takenAt)
+        assertEquals("서울 강남구", photo.address)
     }
 }

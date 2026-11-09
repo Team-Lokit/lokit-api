@@ -13,7 +13,7 @@ class CalendarMonthTest {
     private fun photo(
         id: Long,
         takenAt: LocalDateTime,
-    ) = CalendarPhoto(id = id, url = "https://example.com/$id.jpg", takenAt = takenAt)
+    ) = CalendarPhoto(id = id, url = "https://example.com/$id.jpg", takenAt = takenAt, address = "테헤란로")
 
     @Test
     fun `같은 날짜의 사진 중 기준 시각이 가장 최신인 사진이 대표 사진이다`() {
