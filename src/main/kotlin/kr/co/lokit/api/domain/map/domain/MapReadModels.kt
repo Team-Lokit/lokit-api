@@ -9,6 +9,7 @@ data class ClusterReadModel(
     val longitude: Double,
     val latitude: Double,
     val takenAt: LocalDateTime? = null,
+    val regionName: String? = null,
 )
 
 @JvmInline

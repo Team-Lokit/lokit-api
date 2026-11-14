@@ -41,4 +41,10 @@ data class KakaoAccount(
     val email: String?,
     @field:JsonProperty("is_email_verified")
     val isEmailVerified: Boolean?,
+    val name: String? = null,
+    val profile: KakaoProfile? = null,
+)
+
+data class KakaoProfile(
+    val nickname: String?,
 )

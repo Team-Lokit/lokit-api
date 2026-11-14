@@ -34,6 +34,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delet
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.LocalDateTime
 
@@ -95,6 +96,20 @@ class PhotoControllerTest {
     }
 
     @Test
+    fun `촬영 시각 없이도 사진을 생성할 수 있다`() {
+        doReturn(createPhoto(id = 1L)).`when`(createPhotoUseCase).create(anyObject())
+
+        mockMvc.perform(
+            post("/photos")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"url":"https://example.com/photo.jpg","albumId":1,"longitude":127.0,"latitude":37.5}"""),
+        )
+            .andExpect(status().isCreated)
+    }
+
+    @Test
     fun `사진 상세 조회 성공`() {
         val response = PhotoDetailReadModel(
             id = 1L,
@@ -116,6 +131,26 @@ class PhotoControllerTest {
                 .with(authentication(userAuth())),
         )
             .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `행정구역 밖 좌표 업로드는 400과 PHOTO_002를 반환한다`() {
+        doThrow(BusinessException.PhotoLocationOutOfRegionException())
+            .`when`(createPhotoUseCase).create(anyObject())
+
+        mockMvc.perform(
+            post("/photos")
+                .with(authentication(userAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        createPhotoRequest(takenAt = LocalDateTime.of(2026, 1, 1, 12, 0)),
+                    ),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.data.errorCode").value("PHOTO_002"))
     }
 
     @Test

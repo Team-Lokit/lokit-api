@@ -24,6 +24,7 @@ class JpaEmoticonRepository(
         val userEntity =
             userJpaRepository.findByIdOrNull(emoticon.userId)
                 ?: throw entityNotFound<User>(emoticon.userId)
+        emoticonJpaRepository.purgeDeleted(emoticon.commentId, emoticon.userId, emoticon.emoji)
         val entity = emoticon.toEntity(commentEntity, userEntity)
         return emoticonJpaRepository.save(entity).toDomain()
     }

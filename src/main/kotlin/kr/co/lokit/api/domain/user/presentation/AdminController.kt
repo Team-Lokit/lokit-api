@@ -8,17 +8,16 @@ import kr.co.lokit.api.config.cache.clearAllCaches
 import kr.co.lokit.api.config.security.JwtTokenProvider
 import kr.co.lokit.api.domain.album.application.port.AlbumRepositoryPort
 import kr.co.lokit.api.domain.album.domain.Album
-import kr.co.lokit.api.domain.album.infrastructure.AlbumJpaRepository
 import kr.co.lokit.api.domain.couple.application.CoupleCommandService
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.couple.application.port.`in`.CoupleInviteUseCase
 import kr.co.lokit.api.domain.couple.domain.Couple
 import kr.co.lokit.api.domain.couple.infrastructure.CoupleJpaRepository
-import kr.co.lokit.api.domain.map.infrastructure.AlbumBoundsJpaRepository
 import kr.co.lokit.api.domain.photo.application.port.CommentRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.EmoticonRepositoryPort
 import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.RefreshTokenRepositoryPort
+import kr.co.lokit.api.domain.user.application.port.`in`.HardDeleteUserUseCase
 import kr.co.lokit.api.domain.user.domain.AuthTokens
 import kr.co.lokit.api.domain.user.domain.User
 import kr.co.lokit.api.domain.user.dto.AdminActionResponse
@@ -50,8 +49,6 @@ class AdminController(
     private val coupleInviteUseCase: CoupleInviteUseCase,
     private val refreshTokenRepository: RefreshTokenRepositoryPort,
     private val coupleJpaRepository: CoupleJpaRepository,
-    private val albumJpaRepository: AlbumJpaRepository,
-    private val albumBoundsJpaRepository: AlbumBoundsJpaRepository,
     private val coupleRepository: CoupleRepositoryPort,
     private val albumRepository: AlbumRepositoryPort,
     private val photoRepository: PhotoRepositoryPort,
@@ -59,6 +56,7 @@ class AdminController(
     private val emoticonRepository: EmoticonRepositoryPort,
     private val jwtTokenProvider: JwtTokenProvider,
     private val cacheManager: CacheManager,
+    private val hardDeleteUserUseCase: HardDeleteUserUseCase,
     @Value("\${admin.key}") private val adminKey: String,
 ) : AdminApi {
     @GetMapping("users")
@@ -75,29 +73,12 @@ class AdminController(
     }
 
     @DeleteMapping("users/{email}")
-    @Transactional
     override fun deleteAllByEmail(
         @PathVariable email: String,
         @RequestHeader("X-Admin-Key") key: String,
     ): AdminActionResponse {
         validateAdminKey(key)
-        val user =
-            userJpaRepository.findByEmail(email)
-                ?: throw BusinessException.UserNotFoundException(message = "User not found for email: $email")
-        val userId = user.nonNullId()
-
-        refreshTokenRepository.deleteByUserId(userId)
-
-        val couple = coupleJpaRepository.findByUserIdCandidates(userId).maxByOrNull { it.updatedAt }
-        if (couple != null) {
-            val albumIds = albumJpaRepository.findAlbumIdsByCoupleId(couple.nonNullId())
-            if (albumIds.isNotEmpty()) {
-                albumBoundsJpaRepository.deleteAllByStandardIdIn(albumIds)
-            }
-            coupleJpaRepository.delete(couple)
-        }
-
-        userJpaRepository.delete(user)
+        hardDeleteUserUseCase.hardDeleteByEmail(email)
         cacheManager.clearAllCaches()
 
         return AdminActionResponse(message = "삭제 완료: $email")

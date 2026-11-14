@@ -40,4 +40,23 @@ class PhotoTest {
         assertEquals("https://example.com/photo.jpg", photo.url)
         assertEquals(1L, photo.uploadedById)
     }
+
+    @Test
+    fun `withRegionCode는 지역 코드만 바꾼다`() {
+        val photo = createPhoto(id = 1L, albumId = 2L, coupleId = 3L, location = Location(127.0, 37.5), description = "설명")
+
+        val result = photo.withRegionCode("11680101")
+
+        assertEquals("11680101", result.regionCode)
+        assertEquals(photo, result.copy(regionCode = null))
+    }
+
+    @Test
+    fun `update는 지역 코드를 보존한다`() {
+        val photo = createPhoto(id = 1L, location = Location(127.0, 37.5)).withRegionCode("11680101")
+
+        val result = photo.update(albumId = 5L, description = "수정", longitude = 128.0, latitude = 37.6)
+
+        assertEquals("11680101", result.regionCode)
+    }
 }

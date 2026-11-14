@@ -1,6 +1,7 @@
 package kr.co.lokit.api.domain.photo.presentation.mapping
 
 import kr.co.lokit.api.domain.photo.domain.PhotoDetailReadModel
+import kr.co.lokit.api.fixture.createPhotoRequest
 import kr.co.lokit.api.fixture.createAlbum
 import kr.co.lokit.api.fixture.createLocation
 import kr.co.lokit.api.fixture.createPhoto
@@ -10,6 +11,25 @@ import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 
 class PhotoMappingsTest {
+    @Test
+    fun `촬영 시각이 없으면 업로드 시각을 기준 시각으로 사용한다`() {
+        val before = LocalDateTime.now()
+
+        val photo = createPhotoRequest(takenAt = null).toDomain(userId = 1L)
+
+        val after = LocalDateTime.now()
+        assertTrue(!photo.takenAt.isBefore(before) && !photo.takenAt.isAfter(after))
+    }
+
+    @Test
+    fun `촬영 시각이 있으면 그대로 사용한다`() {
+        val takenAt = LocalDateTime.of(2026, 1, 6, 14, 30)
+
+        val photo = createPhotoRequest(takenAt = takenAt).toDomain(userId = 1L)
+
+        kotlin.test.assertEquals(takenAt, photo.takenAt)
+    }
+
     @Test
     fun `사진 응답 isEditable은 업로더와 조회자가 같을 때 true다`() {
         val ownerId = 1L

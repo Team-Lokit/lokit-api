@@ -68,6 +68,7 @@ interface AuthApi {
     fun appleCallback(
         @RequestParam code: String,
         @RequestParam(required = false) state: String?,
+        @RequestParam(required = false) user: String?,
         @Parameter(hidden = true) req: HttpServletRequest,
     ): ResponseEntity<Unit>
 

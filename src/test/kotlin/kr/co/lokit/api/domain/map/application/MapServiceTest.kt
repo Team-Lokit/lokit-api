@@ -7,6 +7,9 @@ import kr.co.lokit.api.domain.map.application.port.ClusterPhotoProjection
 import kr.co.lokit.api.domain.map.application.port.MapClientPort
 import kr.co.lokit.api.domain.map.application.port.MapQueryPort
 import kr.co.lokit.api.domain.map.domain.BoundsIdType
+import kr.co.lokit.api.domain.map.domain.ClusterPhotoReadModel
+import kr.co.lokit.api.domain.map.domain.ClusterPhotos
+import kr.co.lokit.api.domain.map.domain.ClusterReadModel
 import kr.co.lokit.api.domain.map.domain.Clusters
 import kr.co.lokit.api.domain.map.domain.GridValues
 import kr.co.lokit.api.domain.map.domain.LocationInfoReadModel
@@ -14,6 +17,9 @@ import kr.co.lokit.api.domain.map.domain.MapPhotos
 import kr.co.lokit.api.domain.map.domain.MapPhotosReadModel
 import kr.co.lokit.api.domain.map.domain.PlaceReadModel
 import kr.co.lokit.api.domain.map.domain.Places
+import kr.co.lokit.api.domain.map.domain.RegionClusterId
+import kr.co.lokit.api.domain.map.domain.RegionCode
+import kr.co.lokit.api.domain.map.domain.RegionLevel
 import kr.co.lokit.api.fixture.createAlbum
 import kr.co.lokit.api.fixture.createAlbumBounds
 import kr.co.lokit.api.fixture.createCouple
@@ -22,12 +28,15 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.isNull
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
@@ -61,6 +70,9 @@ class MapServiceTest {
     @Mock
     lateinit var clusterBoundaryMergeStrategy: ClusterBoundaryMergeStrategy
 
+    @Mock
+    lateinit var mapRegionClusterService: MapRegionClusterService
+
     lateinit var mapService: MapQueryService
 
     @BeforeEach
@@ -74,6 +86,7 @@ class MapServiceTest {
                 mapClientPort,
                 mapPhotosCacheService,
                 clusterBoundaryMergeStrategy,
+                mapRegionClusterService,
             )
     }
 
@@ -224,6 +237,84 @@ class MapServiceTest {
     }
 
     @Test
+    fun `getMeV2의 기본 앨범 요청은 정규화된 albumId를 사용한다`() {
+        val defaultAlbumId = 10L
+        val currentVersion = 7L
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(albumRepository.findById(defaultAlbumId)).thenReturn(createAlbum(id = defaultAlbumId, isDefault = true))
+        `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), isNull())).thenReturn(currentVersion)
+        `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), anyOrNull())).thenReturn(Clusters.empty())
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        val result =
+            mapService.getMeV2(
+                user = createUser(id = 1L),
+                longitude = 127.0,
+                latitude = 37.5,
+                zoom = 14.0,
+                albumId = defaultAlbumId,
+            )
+
+        assertEquals(currentVersion, result.dataVersion)
+        verify(mapPhotosCacheService).getDataVersion(any(), any(), eq(1L), isNull())
+        verify(mapRegionClusterService).getClusters(eq(RegionLevel.EUPMYEONDONG), any(), eq(1L), isNull())
+    }
+
+    @Test
+    fun `getMeV2는 줌 15 미만에서 지역 클러스터를 반환한다`() {
+        val regionClusters =
+            Clusters.of(
+                listOf(
+                    ClusterReadModel(
+                        clusterId = "sgg_41110",
+                        count = 5,
+                        thumbnailUrl = "new.jpg",
+                        longitude = 127.0,
+                        latitude = 37.28,
+                        takenAt = LocalDateTime.of(2025, 2, 1, 12, 0),
+                    ),
+                ),
+            )
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(mapRegionClusterService.getClusters(eq(RegionLevel.SIGUNGU), any(), eq(1L), anyOrNull()))
+            .thenReturn(regionClusters)
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        val result =
+            mapService.getMeV2(
+                user = createUser(id = 1L),
+                longitude = 127.0,
+                latitude = 37.5,
+                zoom = 10.0,
+                albumId = null,
+            )
+
+        verify(mapRegionClusterService).getClusters(eq(RegionLevel.SIGUNGU), any(), eq(1L), anyOrNull())
+        assertEquals(regionClusters, result.clusters)
+        assertNull(result.photos)
+    }
+
+    @Test
+    fun `getMeV2는 양자화하지 않은 원본 줌으로 지역 레벨을 정한다`() {
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), anyOrNull())).thenReturn(Clusters.empty())
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        mapService.getMeV2(
+            user = createUser(id = 1L),
+            longitude = 127.0,
+            latitude = 37.5,
+            zoom = 7.75,
+            albumId = null,
+        )
+
+        verify(mapRegionClusterService).getClusters(eq(RegionLevel.SIDO), any(), eq(1L), anyOrNull())
+    }
+
+    @Test
     fun `lastDataVersion이 다르면 셀 캐시 재사용 없이 전체 셀을 재조회한다`() {
         val currentVersion = 9L
         val staleVersion = 8L
@@ -245,6 +336,7 @@ class MapServiceTest {
         )
 
         verify(mapPhotosCacheService).getClusteredPhotos(any(), any(), eq(1L), anyOrNull(), eq(false))
+        verifyNoInteractions(mapRegionClusterService)
     }
 
     @Test
@@ -295,6 +387,7 @@ class MapServiceTest {
             anyOrNull(),
             any(),
         )
+        verifyNoInteractions(mapRegionClusterService)
     }
 
     @Test
@@ -323,6 +416,69 @@ class MapServiceTest {
     }
 
     @Test
+    fun `getMeV2의 비기본 앨범 요청은 albumId를 유지한다`() {
+        val albumId = 22L
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(albumRepository.findById(albumId)).thenReturn(createAlbum(id = albumId, isDefault = false))
+        `when`(mapPhotosCacheService.getDataVersion(any(), any(), eq(1L), eq(albumId))).thenReturn(10L)
+        `when`(mapRegionClusterService.getClusters(any(), any(), eq(1L), eq(albumId))).thenReturn(Clusters.empty())
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        mapService.getMeV2(
+            user = createUser(id = 1L),
+            longitude = 127.0,
+            latitude = 37.5,
+            zoom = 14.0,
+            albumId = albumId,
+        )
+
+        verify(mapPhotosCacheService).getDataVersion(any(), any(), eq(1L), eq(albumId))
+        verify(mapRegionClusterService).getClusters(eq(RegionLevel.EUPMYEONDONG), any(), eq(1L), eq(albumId))
+    }
+
+    @Test
+    fun `getMeV2는 줌 15 이상에서 개별 사진을 반환한다`() {
+        val photos = MapPhotosReadModel(photos = MapPhotos.empty())
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(mapPhotosCacheService.getIndividualPhotos(any(), any(), eq(1L), anyOrNull())).thenReturn(photos)
+        `when`(albumRepository.findAllByCoupleId(1L)).thenReturn(emptyList())
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        val result =
+            mapService.getMeV2(
+                user = createUser(id = 1L),
+                longitude = 127.0,
+                latitude = 37.5,
+                zoom = 15.0,
+                albumId = null,
+            )
+
+        assertNotNull(result.photos)
+        assertNull(result.clusters)
+        verifyNoInteractions(mapRegionClusterService)
+    }
+
+    @Test
+    fun `연결되지 않은 유저의 getMeV2는 빈 클러스터를 반환한다`() {
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(null)
+        `when`(mapPhotosCacheService.getDataVersion(any(), any(), anyOrNull(), anyOrNull())).thenReturn(0L)
+        `when`(albumRepository.photoCountSumByUserId(1L)).thenReturn(0)
+
+        val result =
+            mapService.getMeV2(
+                user = createUser(id = 1L),
+                longitude = 127.0,
+                latitude = 37.5,
+                zoom = 14.0,
+                albumId = null,
+            )
+
+        assertTrue(result.clusters!!.isEmpty())
+        verifyNoInteractions(mapRegionClusterService)
+    }
+
+    @Test
     fun `getClusterPhotos는 연결되지 않은 유저면 빈 리스트를 반환한다`() {
         `when`(coupleRepository.findByUserId(1L)).thenReturn(null)
 
@@ -348,5 +504,42 @@ class MapServiceTest {
 
         assertTrue(result.isEmpty())
         verify(mapQueryPort).findPhotosInGridCell(any(), any(), any(), any(), anyOrNull())
+    }
+
+    @Test
+    fun `getClusterPhotos는 지역 클러스터 ID를 지역 서비스에 위임한다`() {
+        val regionPhotos =
+            ClusterPhotos.of(
+                listOf(
+                    ClusterPhotoReadModel(
+                        id = 3L,
+                        url = "https://example.com/photo3.jpg",
+                        longitude = 127.03,
+                        latitude = 37.50,
+                        takenAt = LocalDateTime.of(2025, 1, 1, 12, 0),
+                        address = "서울 강남구 역삼동",
+                    ),
+                ),
+            )
+        val expectedId = RegionClusterId(RegionLevel.EUPMYEONDONG, RegionCode.of("11680101"))
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(createCouple(id = 1L))
+        `when`(mapRegionClusterService.getClusterPhotos(eq(expectedId), eq(1L))).thenReturn(regionPhotos)
+
+        val result = mapService.getClusterPhotos("emd_11680101", 1L)
+
+        assertEquals(regionPhotos, result)
+        verify(mapRegionClusterService).getClusterPhotos(eq(expectedId), eq(1L))
+        verifyNoInteractions(clusterBoundaryMergeStrategy)
+        verify(mapQueryPort, never()).findPhotosInGridCell(any(), any(), any(), any(), anyOrNull())
+    }
+
+    @Test
+    fun `getClusterPhotos는 연결되지 않은 유저면 지역 ID여도 빈 리스트를 반환한다`() {
+        `when`(coupleRepository.findByUserId(1L)).thenReturn(null)
+
+        val result = mapService.getClusterPhotos("sgg_41110", 1L)
+
+        assertTrue(result.isEmpty())
+        verifyNoInteractions(mapRegionClusterService)
     }
 }

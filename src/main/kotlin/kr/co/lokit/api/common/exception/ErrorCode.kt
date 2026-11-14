@@ -57,6 +57,11 @@ enum class ErrorCode(
 
     // Photo
     DEFAULT_ALBUM_NOT_FOUND_FOR_USER(HttpStatus.INTERNAL_SERVER_ERROR, "PHOTO_001", "사용자의 기본 앨범을 찾을 수 없습니다"),
+    PHOTO_LOCATION_OUT_OF_REGION(
+        HttpStatus.BAD_REQUEST,
+        "PHOTO_002",
+        "지원하지 않는 위치입니다. 대한민국 행정구역 내 좌표만 등록할 수 있습니다",
+    ),
 
     // Comment
     EMOTICON_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_002", "이모지를 찾을 수 없습니다"),

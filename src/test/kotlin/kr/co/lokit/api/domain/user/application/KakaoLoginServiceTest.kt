@@ -18,10 +18,12 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.junit.jupiter.MockitoSettings
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.whenever
 import org.mockito.quality.Strictness
@@ -73,6 +75,7 @@ class KakaoLoginServiceTest {
     private fun setupOAuthClient(
         email: String? = "test@test.com",
         providerId: String = "12345",
+        name: String? = null,
     ) {
         val client = mock(OAuthClientPort::class.java)
         val userInfo = mock(OAuthUserInfo::class.java)
@@ -83,6 +86,7 @@ class KakaoLoginServiceTest {
         whenever(client.getUserInfo("oauth-access-token")).thenReturn(userInfo)
 
         whenever(userInfo.email).thenReturn(email)
+        whenever(userInfo.name).thenReturn(name)
 
         if (email == null) {
             whenever(userInfo.providerId).thenReturn(providerId)
@@ -109,6 +113,42 @@ class KakaoLoginServiceTest {
         assertEquals(1L, result.userId)
         assertEquals("access-token", result.tokens.accessToken)
         assertEquals("refresh-token", result.tokens.refreshToken)
+    }
+
+    @Test
+    fun `첫 로그인이면 카카오 이름을 닉네임으로 저장한다`() {
+        setupOAuthClient(name = "김승진")
+        whenever(userRepository.save(any())).thenAnswer { (it.arguments[0] as User).copy(id = 1L) }
+        setupTokenGeneration()
+
+        val result = kakaoLoginService.login("auth-code")
+
+        val saved = argumentCaptor<User>().apply { verify(userRepository).save(capture()) }.firstValue
+        assertEquals("김승진", saved.name)
+        assertEquals(true, result.isNewUser)
+    }
+
+    @Test
+    fun `첫 로그인인데 이름이 없으면 이메일 기반 닉네임으로 저장한다`() {
+        setupOAuthClient(name = null)
+        whenever(userRepository.save(any())).thenAnswer { (it.arguments[0] as User).copy(id = 1L) }
+        setupTokenGeneration()
+
+        kakaoLoginService.login("auth-code")
+
+        val saved = argumentCaptor<User>().apply { verify(userRepository).save(capture()) }.firstValue
+        assertEquals("test", saved.name)
+    }
+
+    @Test
+    fun `기존 사용자는 카카오 이름이 달라도 닉네임을 바꾸지 않는다`() {
+        setupOAuthClient(name = "새이름")
+        whenever(userRepository.findByEmail("test@test.com")).thenReturn(User(id = 1L, email = "test@test.com", name = "기존닉네임"))
+        setupTokenGeneration()
+
+        kakaoLoginService.login("auth-code")
+
+        verify(userRepository, never()).save(any())
     }
 
     @Test

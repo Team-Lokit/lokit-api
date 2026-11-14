@@ -28,6 +28,8 @@ import kr.co.lokit.api.domain.map.domain.MapPhotosReadModel
 import kr.co.lokit.api.domain.map.domain.MapZoom
 import kr.co.lokit.api.domain.map.domain.MercatorProjection
 import kr.co.lokit.api.domain.map.domain.PlaceSearchReadModel
+import kr.co.lokit.api.domain.map.domain.RegionClusterId
+import kr.co.lokit.api.domain.map.domain.RegionLevel
 import kr.co.lokit.api.domain.map.domain.ThumbnailUrls
 import kr.co.lokit.api.domain.user.domain.User
 import org.springframework.stereotype.Service
@@ -44,6 +46,7 @@ class MapQueryService(
     private val mapClientPort: MapClientPort,
     private val mapPhotosCacheService: MapPhotosCacheService,
     private val clusterBoundaryMergeStrategy: ClusterBoundaryMergeStrategy,
+    private val mapRegionClusterService: MapRegionClusterService,
 ) : GetMapUseCase,
     SearchLocationUseCase {
     private data class MapViewerContext(
@@ -56,7 +59,7 @@ class MapQueryService(
         const val GRID_ZOOM_STEPS = 2.0
     }
 
-    private fun getPhotos(
+    private fun getGridPhotos(
         zoom: Double,
         bbox: BBox,
         context: MapViewerContext,
@@ -87,6 +90,34 @@ class MapQueryService(
         }
     }
 
+    private fun getRegionPhotos(
+        zoom: Double,
+        bbox: BBox,
+        context: MapViewerContext,
+    ): MapPhotosReadModel {
+        val boundedBbox = bbox.clampToKorea() ?: return emptyPhotosResponse(zoom)
+        if (isMissingCoupleForAuthenticatedUser(context.userId, context.coupleId)) {
+            return emptyPhotosResponse(zoom)
+        }
+        val level =
+            RegionLevel.forZoom(zoom)
+                ?: return mapPhotosCacheService.getIndividualPhotos(
+                    zoom = zoom,
+                    bbox = boundedBbox,
+                    coupleId = context.coupleId,
+                    albumId = context.albumId,
+                )
+        return MapPhotosReadModel(
+            clusters =
+                mapRegionClusterService.getClusters(
+                    level = level,
+                    bbox = boundedBbox,
+                    coupleId = context.coupleId,
+                    albumId = context.albumId,
+                ),
+        )
+    }
+
     @Transactional(readOnly = true)
     override fun getClusterPhotos(
         clusterId: String,
@@ -95,6 +126,9 @@ class MapQueryService(
         val context = resolveViewerContext(userId = userId, albumId = null)
         if (isMissingCoupleForAuthenticatedUser(context.userId, context.coupleId)) {
             return ClusterPhotos.empty()
+        }
+        RegionClusterId.parse(clusterId)?.let { regionClusterId ->
+            return mapRegionClusterService.getClusterPhotos(regionClusterId, context.coupleId)
         }
         val parsedClusterId = ClusterId.parseDetailed(clusterId)
         val rawMergeZoom = parsedClusterId.mergeZoom ?: parsedClusterId.zoom.toDouble()
@@ -164,6 +198,29 @@ class MapQueryService(
         zoom: Double,
         albumId: Long?,
         lastDataVersion: Long?,
+    ): MapMeReadModel =
+        loadMe(user, longitude, latitude, zoom, albumId) { level, bbox, context, currentVersion ->
+            getGridPhotos(level, bbox, context, lastDataVersion, currentVersion)
+        }
+
+    override fun getMeV2(
+        user: User,
+        longitude: Double,
+        latitude: Double,
+        zoom: Double,
+        albumId: Long?,
+    ): MapMeReadModel =
+        loadMe(user, longitude, latitude, zoom, albumId) { level, bbox, context, _ ->
+            getRegionPhotos(level, bbox, context)
+        }
+
+    private fun loadMe(
+        user: User,
+        longitude: Double,
+        latitude: Double,
+        zoom: Double,
+        albumId: Long?,
+        loadPhotos: (zoom: Double, bbox: BBox, context: MapViewerContext, currentVersion: Long) -> MapPhotosReadModel,
     ): MapMeReadModel {
         val mapZoom = MapZoom.from(zoom)
         val requestedBbox = BBox.fromCenter(mapZoom.level, longitude, latitude)
@@ -185,13 +242,7 @@ class MapQueryService(
                         findAlbumsForCouple(context.coupleId)
                     },
                     scope.fork {
-                        getPhotos(
-                            zoom = mapZoom.level,
-                            bbox = requestedBbox,
-                            context = context,
-                            lastDataVersion = lastDataVersion,
-                            currentDataVersion = currentVersion,
-                        )
+                        loadPhotos(mapZoom.level, requestedBbox, context, currentVersion)
                     },
                 )
             }

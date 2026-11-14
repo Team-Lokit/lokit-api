@@ -15,6 +15,14 @@ interface GetMapUseCase {
         lastDataVersion: Long? = null,
     ): MapMeReadModel
 
+    fun getMeV2(
+        user: User,
+        longitude: Double,
+        latitude: Double,
+        zoom: Double,
+        albumId: Long? = null,
+    ): MapMeReadModel
+
     fun getClusterPhotos(
         clusterId: String,
         userId: Long?,
