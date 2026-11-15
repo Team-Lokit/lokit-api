@@ -80,17 +80,17 @@ interface AuthApi {
                 "- 요청 본문은 **선택**입니다.\n" +
                 "- `deviceToken` 을 보내면 **이 기기의 토큰만** 삭제합니다. 같은 계정의 다른 기기는 계속 푸시를 받습니다.\n" +
                 "- 본문을 생략하거나 `deviceToken` 이 null·빈 문자열이면 사용자의 디바이스 토큰을 **전부** 삭제합니다(기존 동작).\n" +
-                "- 본문을 보낼 때는 `Content-Type: application/json` 을 사용하세요.",
+                "- 본문을 보낼 때는 `Content-Type: application/json` 을 사용하세요.\n" +
+                "- 토큰이 없거나 유효하지 않아도 401 대신 204 를 반환하며, 인증 쿠키만 삭제합니다(서버 측 토큰은 건드리지 않음).",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "204", description = "로그아웃 성공"),
+            ApiResponse(responseCode = "204", description = "로그아웃 성공 (토큰이 유효하지 않은 경우에도 쿠키 삭제 후 204)"),
             ApiResponse(responseCode = "400", description = "deviceToken 이 512자를 초과", content = [Content()]),
-            ApiResponse(responseCode = "401", description = "인증 필요", content = [Content()]),
         ],
     )
     fun logout(
-        @Parameter(hidden = true) userId: Long,
+        @Parameter(hidden = true) userId: Long?,
         @SwaggerRequestBody(
             required = false,
             description = "선택. 이 기기의 FCM 토큰을 담으면 해당 기기 토큰만 삭제합니다.",
