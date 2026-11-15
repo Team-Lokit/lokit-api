@@ -1,5 +1,9 @@
 package kr.co.lokit.api.domain.album.infrastructure
 
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.domain.album.application.port.AlbumRepositoryPort
 import kr.co.lokit.api.domain.couple.infrastructure.CoupleEntity
@@ -11,20 +15,13 @@ import kr.co.lokit.api.domain.user.infrastructure.UserJpaRepository
 import kr.co.lokit.api.fixture.createAlbum
 import kr.co.lokit.api.fixture.createCoupleEntity
 import kr.co.lokit.api.fixture.createUserEntity
+import kr.co.lokit.api.support.JpaSliceTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
-@DataJpaTest
-@Import(JpaAlbumRepository::class)
-class AlbumRepositoryTest {
+class AlbumRepositoryTest : JpaSliceTest() {
     @Autowired
     lateinit var albumRepository: AlbumRepositoryPort
 

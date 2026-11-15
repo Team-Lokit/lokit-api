@@ -1,54 +1,23 @@
 package kr.co.lokit.api.domain.calendar.presentation
 
-import kr.co.lokit.api.config.security.CompositeAuthenticationResolver
-import kr.co.lokit.api.config.security.JwtTokenProvider
-import kr.co.lokit.api.config.web.CookieGenerator
-import kr.co.lokit.api.config.web.CookieProperties
-import kr.co.lokit.api.domain.calendar.application.port.`in`.GetCalendarUseCase
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.YearMonth
 import kr.co.lokit.api.domain.calendar.domain.Anniversary
 import kr.co.lokit.api.domain.calendar.domain.AnniversaryType
 import kr.co.lokit.api.domain.calendar.domain.CalendarDay
 import kr.co.lokit.api.domain.calendar.domain.CalendarMonth
 import kr.co.lokit.api.domain.calendar.domain.CalendarPhoto
-import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.fixture.userAuth
+import kr.co.lokit.api.support.ControllerSliceTest
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.whenever
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.YearMonth
 
-@WebMvcTest(CalendarController::class)
-class CalendarControllerTest {
-    @Autowired
-    lateinit var mockMvc: MockMvc
-
-    @MockitoBean
-    lateinit var compositeAuthenticationResolver: CompositeAuthenticationResolver
-
-    @MockitoBean
-    lateinit var authService: AuthService
-
-    @MockitoBean
-    lateinit var jwtTokenProvider: JwtTokenProvider
-
-    @MockitoBean
-    lateinit var cookieProperties: CookieProperties
-
-    @MockitoBean
-    lateinit var cookieGenerator: CookieGenerator
-
-    @MockitoBean
-    lateinit var getCalendarUseCase: GetCalendarUseCase
-
+class CalendarControllerTest : ControllerSliceTest() {
     @Test
     fun `월간 캘린더를 조회한다`() {
         val month = YearMonth.of(2026, 11)

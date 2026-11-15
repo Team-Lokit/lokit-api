@@ -1,19 +1,19 @@
 package kr.co.lokit.api.domain.notification.infrastructure
 
 import jakarta.persistence.EntityManager
-import kr.co.lokit.api.domain.notification.application.port.NotificationRepositoryPort
-import kr.co.lokit.api.domain.notification.domain.Notification
-import kr.co.lokit.api.domain.notification.domain.NotificationType
-import kr.co.lokit.api.fixture.createNotification
-import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kr.co.lokit.api.domain.notification.application.port.NotificationRepositoryPort
+import kr.co.lokit.api.domain.notification.domain.Notification
+import kr.co.lokit.api.domain.notification.domain.NotificationType
+import kr.co.lokit.api.fixture.createNotification
+import kr.co.lokit.api.support.JpaSliceTest
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 
 /**
  * 실 DB(H2 MODE=PostgreSQL, ddl-auto=create-drop) 실측 테스트.
@@ -26,9 +26,7 @@ import kotlin.test.assertTrue
  * - 더티체킹이 실제로 UPDATE 로 반영되는가 (save 미호출 구현의 실증)
  * - Kotlin `is` 접두 프로퍼티가 `is_read` 컬럼으로 매핑되는가 (`read` 로 잘리는 함정)
  */
-@DataJpaTest
-@Import(JpaNotificationRepository::class)
-class NotificationRepositoryTest {
+class NotificationRepositoryTest : JpaSliceTest() {
     @Autowired
     lateinit var repository: NotificationRepositoryPort
 

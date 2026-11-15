@@ -1,12 +1,5 @@
 package kr.co.lokit.api.domain.map.presentation
 
-import kr.co.lokit.api.common.permission.PermissionService
-import kr.co.lokit.api.config.security.CompositeAuthenticationResolver
-import kr.co.lokit.api.config.security.JwtTokenProvider
-import kr.co.lokit.api.config.web.CookieGenerator
-import kr.co.lokit.api.config.web.CookieProperties
-import kr.co.lokit.api.domain.map.application.port.`in`.GetMapUseCase
-import kr.co.lokit.api.domain.map.application.port.`in`.SearchLocationUseCase
 import kr.co.lokit.api.domain.map.domain.AlbumMapInfoReadModel
 import kr.co.lokit.api.domain.map.domain.AlbumThumbnails
 import kr.co.lokit.api.domain.map.domain.BoundingBoxReadModel
@@ -16,8 +9,8 @@ import kr.co.lokit.api.domain.map.domain.LocationInfoReadModel
 import kr.co.lokit.api.domain.map.domain.MapMeReadModel
 import kr.co.lokit.api.domain.map.domain.PlaceSearchReadModel
 import kr.co.lokit.api.domain.map.domain.Places
-import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.fixture.userAuth
+import kr.co.lokit.api.support.ControllerSliceTest
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyDouble
 import org.mockito.ArgumentMatchers.anyLong
@@ -29,44 +22,12 @@ import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
 import org.mockito.kotlin.verify
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@WebMvcTest(MapController::class)
-class MapControllerTest {
-    @Autowired
-    lateinit var mockMvc: MockMvc
-
-    @MockitoBean
-    lateinit var compositeAuthenticationResolver: CompositeAuthenticationResolver
-
-    @MockitoBean
-    lateinit var authService: AuthService
-
-    @MockitoBean
-    lateinit var jwtTokenProvider: JwtTokenProvider
-
-    @MockitoBean
-    lateinit var cookieProperties: CookieProperties
-
-    @MockitoBean
-    lateinit var cookieGenerator: CookieGenerator
-
-    @MockitoBean
-    lateinit var getMapUseCase: GetMapUseCase
-
-    @MockitoBean
-    lateinit var searchLocationUseCase: SearchLocationUseCase
-
-    @MockitoBean
-    lateinit var permissionService: PermissionService
-
+class MapControllerTest : ControllerSliceTest() {
     private fun createMapMeResponse(): MapMeReadModel =
         MapMeReadModel(
             boundingBox = BoundingBoxReadModel(west = 126.9, south = 37.4, east = 127.1, north = 37.6),

@@ -1,57 +1,25 @@
 package kr.co.lokit.api.domain.notification.presentation
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import kr.co.lokit.api.config.security.CompositeAuthenticationResolver
-import kr.co.lokit.api.config.security.JwtTokenProvider
-import kr.co.lokit.api.config.web.CookieGenerator
-import kr.co.lokit.api.config.web.CookieProperties
-import kr.co.lokit.api.domain.notification.application.port.`in`.NotificationSettingsUseCase
 import kr.co.lokit.api.domain.notification.domain.NotificationSettings
 import kr.co.lokit.api.domain.notification.domain.NotificationType
-import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.fixture.userAuth
+import kr.co.lokit.api.support.ControllerSliceTest
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@WebMvcTest(NotificationSettingsController::class)
-class NotificationSettingsControllerTest {
-
-    @Autowired
-    lateinit var mockMvc: MockMvc
-
+class NotificationSettingsControllerTest : ControllerSliceTest() {
     val objectMapper: ObjectMapper = ObjectMapper()
-
-    @MockitoBean
-    lateinit var compositeAuthenticationResolver: CompositeAuthenticationResolver
-
-    @MockitoBean
-    lateinit var authService: AuthService
-
-    @MockitoBean
-    lateinit var jwtTokenProvider: JwtTokenProvider
-
-    @MockitoBean
-    lateinit var cookieProperties: CookieProperties
-
-    @MockitoBean
-    lateinit var cookieGenerator: CookieGenerator
-
-    @MockitoBean
-    lateinit var notificationSettingsUseCase: NotificationSettingsUseCase
 
     // F1
     @Test

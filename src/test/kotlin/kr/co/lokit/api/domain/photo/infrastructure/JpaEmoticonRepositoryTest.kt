@@ -1,6 +1,8 @@
 package kr.co.lokit.api.domain.photo.infrastructure
 
 import jakarta.persistence.EntityManager
+import java.time.LocalDate
+import kotlin.test.assertTrue
 import kr.co.lokit.api.domain.album.infrastructure.AlbumJpaRepository
 import kr.co.lokit.api.domain.couple.infrastructure.CoupleJpaRepository
 import kr.co.lokit.api.domain.couple.infrastructure.CoupleUserEntity
@@ -11,17 +13,12 @@ import kr.co.lokit.api.fixture.createAlbumEntity
 import kr.co.lokit.api.fixture.createCoupleEntity
 import kr.co.lokit.api.fixture.createPhotoEntity
 import kr.co.lokit.api.fixture.createUserEntity
+import kr.co.lokit.api.support.JpaSliceTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
-import java.time.LocalDate
-import kotlin.test.assertTrue
 
-@DataJpaTest
-@Import(JpaEmoticonRepository::class)
-class JpaEmoticonRepositoryTest {
+class JpaEmoticonRepositoryTest : JpaSliceTest() {
     @Autowired
     lateinit var emoticonRepository: JpaEmoticonRepository
 

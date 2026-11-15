@@ -1,24 +1,22 @@
 package kr.co.lokit.api.domain.notification.infrastructure
 
 import jakarta.persistence.EntityManager
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kr.co.lokit.api.domain.notification.application.port.NotificationSettingsRepositoryPort
 import kr.co.lokit.api.domain.notification.domain.NotificationSettings
 import kr.co.lokit.api.domain.notification.domain.NotificationType
+import kr.co.lokit.api.support.JpaSliceTest
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 /**
  * 실 DB(H2 MODE=PostgreSQL, ddl-auto=create-drop) 실측 테스트(계약 §4-E).
  * UNIQUE(user_id) 제약, disabled_types 문자열 컬럼 왕복, 마스터 토글 후 종류별 값 보존은
  * 목으로 원리적으로 검증 불가하다 — 선례 DeviceTokenRepositoryTest 와 같은 이유로 @DataJpaTest 를 쓴다.
  */
-@DataJpaTest
-@Import(JpaNotificationSettingsRepository::class)
-class NotificationSettingsRepositoryTest {
+class NotificationSettingsRepositoryTest : JpaSliceTest() {
     @Autowired
     lateinit var repository: NotificationSettingsRepositoryPort
 
