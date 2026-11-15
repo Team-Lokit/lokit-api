@@ -34,7 +34,9 @@ class PendingUploadNotificationScheduler(
             try {
                 uploadNotificationService.fire(pending, now)
             } catch (e: Exception) {
-                log.warn("업로드 알림 발송 실패 (다음 주기에 재시도): pendingId={}", pending.id, e)
+                // fire 는 claim(markSent) 단계 실패만 던진다 — 아무것도 커밋되지 않았으므로 다음 주기에 그대로 재시도된다.
+                // claim 이후 실패는 fire 내부에서 재시도·error 로그로 처리된다.
+                log.warn("업로드 알림 claim 실패 (커밋 안 됨, 다음 주기에 재시도): pendingId={}", pending.id, e)
             }
         }
         log.info("업로드 알림 배치 처리: {}건", targets.size)

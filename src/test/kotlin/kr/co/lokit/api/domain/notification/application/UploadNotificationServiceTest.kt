@@ -13,10 +13,12 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
+import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.time.LocalDateTime
@@ -44,12 +46,16 @@ class UploadNotificationServiceTest {
     @Mock
     lateinit var notificationDispatchService: NotificationDispatchService
 
+    @Mock
+    lateinit var coupleConnectionChecker: CoupleConnectionChecker
+
     lateinit var service: UploadNotificationService
 
     private val now: LocalDateTime = LocalDateTime.of(2026, 1, 1, 12, 0)
 
     @BeforeEach
     fun setUp() {
+        lenient().`when`(coupleConnectionChecker.areConnectedPartners(any(), any())).thenReturn(true)
         service =
             UploadNotificationService(
                 pendingRepository,
@@ -57,6 +63,7 @@ class UploadNotificationServiceTest {
                 userRepository,
                 notificationDispatchService,
                 LockManager(),
+                coupleConnectionChecker,
             )
     }
 
@@ -306,6 +313,50 @@ class UploadNotificationServiceTest {
         val result = assertNotNull(service.fire(pending, now))
 
         assertTrue(result.body.startsWith("상대방님이"), "실제 본문: ${result.body}")
+    }
+
+    @Test
+    fun `claim 시점에 커플 연결이 끊겼으면 알림을 만들지 않는다`() {
+        val pending = duePending(photoIds = listOf(10L))
+        stubClaim(pending)
+        whenever(coupleConnectionChecker.areConnectedPartners(pending.recipientUserId, pending.actorUserId))
+            .thenReturn(false)
+
+        val result = service.fire(pending, now)
+
+        assertNull(result)
+        verify(photoRepository, never()).findAllByIds(any())
+        verify(notificationDispatchService, never()).dispatchImmediately(any())
+    }
+
+    @Test
+    fun `claim 이후 발송 준비가 일시 실패하면 재시도해서 발송한다`() {
+        val pending = duePending(photoIds = listOf(10L))
+        stubClaim(pending)
+        whenever(photoRepository.findAllByIds(listOf(10L)))
+            .thenThrow(IllegalStateException("DB 일시 장애"))
+            .thenReturn(listOf(createPhoto(id = 10L, address = "성수동")))
+        stubActorName("테스트")
+        stubDispatchEcho()
+
+        val result = service.fire(pending, now)
+
+        assertNotNull(result)
+        verify(pendingRepository).markSent(7L, now)
+        verify(notificationDispatchService).dispatchImmediately(any())
+    }
+
+    @Test
+    fun `claim 이후 발송 준비가 계속 실패하면 재시도를 소진하고 예외 없이 null 을 반환한다`() {
+        val pending = duePending(photoIds = listOf(10L))
+        stubClaim(pending)
+        whenever(photoRepository.findAllByIds(listOf(10L))).thenThrow(IllegalStateException("DB 장애"))
+
+        val result = service.fire(pending, now)
+
+        assertNull(result)
+        verify(photoRepository, times(UploadNotificationService.DISPATCH_MAX_ATTEMPTS)).findAllByIds(listOf(10L))
+        verify(notificationDispatchService, never()).dispatchImmediately(any())
     }
 
     /** scheduledAt == now 는 발송 대상이다(N-1 과 부호 반대, D3). */

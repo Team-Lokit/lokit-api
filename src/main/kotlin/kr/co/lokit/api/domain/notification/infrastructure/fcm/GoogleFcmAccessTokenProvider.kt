@@ -16,8 +16,20 @@ class GoogleFcmAccessTokenProvider(
         }
     }
 
+    @Volatile
+    private var forceRefresh: Boolean = false
+
     override fun accessToken(): String {
-        credentials.refreshIfExpired()
+        if (forceRefresh) {
+            forceRefresh = false
+            credentials.refresh()
+        } else {
+            credentials.refreshIfExpired()
+        }
         return credentials.accessToken.tokenValue
+    }
+
+    override fun invalidate() {
+        forceRefresh = true
     }
 }

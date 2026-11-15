@@ -20,6 +20,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
+import org.mockito.Mockito.lenient
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
@@ -61,10 +62,15 @@ class NotificationDispatchServiceTest {
     @Mock
     lateinit var pushSenderPort: PushSenderPort
 
+    @Mock
+    lateinit var coupleConnectionChecker: CoupleConnectionChecker
+
     lateinit var service: NotificationDispatchService
 
     @BeforeEach
     fun setUp() {
+        // 기본은 "아직 연결된 커플". 연결 해제 시나리오만 개별 테스트에서 false 로 덮는다.
+        lenient().`when`(coupleConnectionChecker.areConnectedPartners(any(), any())).thenReturn(true)
         service = newService(pushSenderPort)
     }
 
@@ -77,6 +83,7 @@ class NotificationDispatchServiceTest {
             LockManager(),
             notificationSettingsRepository,
             sender,
+            coupleConnectionChecker,
         )
 
     @Test
@@ -355,6 +362,7 @@ class NotificationDispatchServiceTest {
     @Test
     fun `마감 시 그룹 개수가 2 이상이면 통합 문구로 본문을 갱신하고 후속 1건을 발송한다`() {
         val window = createNotification(id = 42L, actorUserId = ACTOR_ID, groupCount = 3)
+        whenever(notificationRepository.findByNotifId(window.notifId)).thenReturn(window)
         whenever(userRepository.findById(ACTOR_ID)).thenReturn(createUser(id = ACTOR_ID, name = "지민"))
         whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
             createNotification(id = 42L, groupCount = 3, body = "지민님이 댓글 3개를 남겼어요", groupClosedAt = NOW),
@@ -380,6 +388,7 @@ class NotificationDispatchServiceTest {
     @Test
     fun `마감 시 그룹 개수가 2 이상인 반응은 반응 문구로 본문을 갱신한다`() {
         val window = createNotification(id = 42L, actorUserId = ACTOR_ID, notificationType = NotificationType.REACTION, groupCount = 3)
+        whenever(notificationRepository.findByNotifId(window.notifId)).thenReturn(window)
         whenever(userRepository.findById(ACTOR_ID)).thenReturn(createUser(id = ACTOR_ID, name = "지민"))
         whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
             createNotification(
@@ -409,6 +418,7 @@ class NotificationDispatchServiceTest {
     @Test
     fun `마감 시 행위자 조회가 실패하면 기본 이름으로 통합 문구를 만든다`() {
         val window = createNotification(id = 42L, actorUserId = ACTOR_ID, groupCount = 3)
+        whenever(notificationRepository.findByNotifId(window.notifId)).thenReturn(window)
         whenever(userRepository.findById(ACTOR_ID)).thenReturn(null)
         whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
             createNotification(id = 42L, groupCount = 3, body = "상대방님이 댓글 3개를 남겼어요", groupClosedAt = NOW),
@@ -428,6 +438,7 @@ class NotificationDispatchServiceTest {
     @Test
     fun `마감 시 그룹 개수가 1이면 마감 표시만 하고 발송하지 않는다`() {
         val window = createNotification(id = 42L, groupCount = 1, body = "상대방님이 댓글을 남겼어요")
+        whenever(notificationRepository.findByNotifId(window.notifId)).thenReturn(window)
         whenever(notificationRepository.closeGroupWindow(42L, NOW, "상대방님이 댓글을 남겼어요")).thenReturn(
             createNotification(id = 42L, groupCount = 1, groupClosedAt = NOW),
         )
@@ -559,6 +570,7 @@ class NotificationDispatchServiceTest {
     @Test
     fun `그룹 마감 요약 푸시도 수신자 설정을 따른다`() {
         val window = createNotification(id = 42L, actorUserId = ACTOR_ID, groupCount = 3)
+        whenever(notificationRepository.findByNotifId(window.notifId)).thenReturn(window)
         whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
             createNotification(id = 42L, groupCount = 3, body = "지민님이 댓글 3개를 남겼어요", groupClosedAt = NOW),
         )
@@ -569,6 +581,83 @@ class NotificationDispatchServiceTest {
         // request.md 에 누락돼 있던 세 번째 발송 경로(스케줄러 → closeGroupWindow → 2차 요약 푸시).
         verify(notificationRepository).closeGroupWindow(eq(42L), eq(NOW), any())
         verifyPushSuppressed()
+    }
+
+    @Test
+    fun `마감 직전 카운트가 늘었으면 스케줄러 스냅샷이 아니라 최신 행 기준으로 요약 푸시를 보낸다`() {
+        // 스케줄러가 조회할 땐 1건이었지만 락을 잡기 전에 2번째 댓글이 커밋된 상황.
+        val stale = createNotification(id = 42L, actorUserId = ACTOR_ID, groupCount = 1)
+        val fresh = stale.copy(groupCount = 2)
+        whenever(notificationRepository.findByNotifId(stale.notifId)).thenReturn(fresh)
+        whenever(userRepository.findById(ACTOR_ID)).thenReturn(createUser(id = ACTOR_ID, name = "지민"))
+        whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
+            fresh.copy(body = "지민님이 댓글 2개를 남겼어요", groupClosedAt = NOW),
+        )
+        whenever(deviceTokenRepository.findAllByUserId(RECIPIENT_ID)).thenReturn(
+            listOf(createDeviceToken(id = 1L, userId = RECIPIENT_ID, token = "fcm-a")),
+        )
+        whenever(pushSenderPort.send(any())).thenReturn(PushSendResult(successTokens = listOf("fcm-a")))
+
+        service.closeGroupWindow(stale, NOW)
+
+        val captor = argumentCaptor<String>()
+        verify(notificationRepository).closeGroupWindow(eq(42L), eq(NOW), captor.capture())
+        assertEquals("지민님이 댓글 2개를 남겼어요", captor.firstValue)
+        verify(pushSenderPort).send(any())
+    }
+
+    @Test
+    fun `그룹 윈도우가 열린 사이 커플 연결이 끊겼으면 마감만 하고 요약 푸시는 보내지 않는다`() {
+        val window = createNotification(id = 42L, actorUserId = ACTOR_ID, groupCount = 3)
+        whenever(notificationRepository.findByNotifId(window.notifId)).thenReturn(window)
+        whenever(userRepository.findById(ACTOR_ID)).thenReturn(createUser(id = ACTOR_ID, name = "지민"))
+        whenever(notificationRepository.closeGroupWindow(eq(42L), eq(NOW), any())).thenReturn(
+            window.copy(body = "지민님이 댓글 3개를 남겼어요", groupClosedAt = NOW),
+        )
+        whenever(coupleConnectionChecker.areConnectedPartners(window.recipientUserId, ACTOR_ID)).thenReturn(false)
+
+        service.closeGroupWindow(window, NOW)
+
+        verify(notificationRepository).closeGroupWindow(eq(42L), eq(NOW), any())
+        verify(pushSenderPort, never()).send(any())
+    }
+
+    @Test
+    fun `이미 마감된 알림이면 다시 마감하거나 발송하지 않는다`() {
+        val window = createNotification(id = 42L, groupCount = 3)
+        whenever(notificationRepository.findByNotifId(window.notifId)).thenReturn(window.copy(groupClosedAt = NOW))
+
+        service.closeGroupWindow(window, NOW)
+
+        verify(notificationRepository, never()).closeGroupWindow(any(), any(), any())
+        verify(pushSenderPort, never()).send(any())
+    }
+
+    @Test
+    fun `푸시 단계에서 예외가 나도 호출자로 전파하지 않고 저장된 알림을 반환한다`() {
+        val notification = createNotification(id = 7L)
+        whenever(notificationRepository.save(any())).thenReturn(notification)
+        whenever(deviceTokenRepository.findAllByUserId(any())).thenThrow(IllegalStateException("DB 연결 끊김"))
+
+        val saved = assertDoesNotThrow { service.dispatchImmediately(notification) }
+
+        assertEquals(7L, saved.id)
+        verify(pushSenderPort, never()).send(any())
+    }
+
+    @Test
+    fun `분석 이벤트 기록이 실패해도 무효 토큰 정리는 수행한다`() {
+        val notification = createNotification(id = 7L)
+        whenever(notificationRepository.save(any())).thenReturn(notification)
+        whenever(deviceTokenRepository.findAllByUserId(any())).thenReturn(
+            listOf(createDeviceToken(id = 1L, userId = RECIPIENT_ID, token = "fcm-dead")),
+        )
+        whenever(pushSenderPort.send(any())).thenReturn(PushSendResult(invalidTokens = listOf("fcm-dead")))
+        whenever(appEventLogPort.record(any(), any(), anyOrNull(), anyOrNull(), any())).thenThrow(IllegalStateException("로그 DB 장애"))
+
+        assertDoesNotThrow { service.dispatchImmediately(notification) }
+
+        verify(deviceTokenRepository).deleteAllByTokens(listOf("fcm-dead"))
     }
 
     @Test

@@ -1,5 +1,6 @@
 package kr.co.lokit.api.domain.notification.application
 
+import kr.co.lokit.api.common.constants.CoupleStatus
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
 import kr.co.lokit.api.domain.photo.domain.PhotoCreatedEvent
 import kr.co.lokit.api.fixture.createCouple
@@ -66,6 +67,17 @@ class PhotoUploadNotificationListenerTest {
     @Test
     fun `커플이 없으면 예약하지 않는다`() {
         whenever(coupleRepository.findById(COUPLE_ID)).thenReturn(null)
+
+        listener.handlePhotoCreated(uploadEvent())
+
+        verify(uploadNotificationService, never()).schedule(any(), any(), any(), any(), any())
+    }
+
+    @Test
+    fun `연결이 끊긴 커플이면 업로드 알림을 예약하지 않는다`() {
+        whenever(coupleRepository.findById(COUPLE_ID)).thenReturn(
+            createCouple(id = COUPLE_ID, userIds = listOf(UPLOADER_ID, PARTNER_ID), status = CoupleStatus.DISCONNECTED),
+        )
 
         listener.handlePhotoCreated(uploadEvent())
 

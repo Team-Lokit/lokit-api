@@ -45,6 +45,9 @@ data class Couple(
 
     fun deIdentifiedUserId(): Long? = disconnectedByUserId.takeIf { status.isDisconnectedOrExpired }
 
+    /** 알림 등 "지금 함께인 관계"를 전제로 하는 기능의 판정. DISCONNECTED·EXPIRED 는 false. */
+    fun isConnected(): Boolean = status == CoupleStatus.CONNECTED
+
     fun isConnectedAndFull(): Boolean = status == CoupleStatus.CONNECTED && isFull()
 
     fun disconnectActionFor(userId: Long): CoupleDisconnectAction =
