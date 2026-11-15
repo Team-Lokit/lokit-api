@@ -99,7 +99,7 @@ class CommentServiceTest {
     }
 
     @Test
-    fun `이모지를 추가하면 사진 식별자를 담은 반응 이벤트가 발행된다`() {
+    fun `이모지를 추가하면 사진 식별자와 댓글 작성자를 담은 반응 이벤트가 발행된다`() {
         val savedEmoticon = createEmoticon(id = 5L, commentId = 1L, userId = 1L, emoji = "❤️")
         `when`(emoticonRepository.existsByCommentIdAndUserIdAndEmoji(1L, 1L, "❤️")).thenReturn(false)
         `when`(emoticonRepository.save(any())).thenReturn(savedEmoticon)
@@ -112,6 +112,7 @@ class CommentServiceTest {
         val event = captor.firstValue
         assertEquals(5L, event.emoticonId)
         assertEquals(1L, event.commentId)
+        assertEquals(2L, event.commentAuthorUserId)
         assertEquals(10L, event.photoId)
         assertEquals(1L, event.actorUserId)
         assertEquals("❤️", event.emoji)
