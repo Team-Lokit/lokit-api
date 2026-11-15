@@ -195,12 +195,15 @@ class AuthController(
     @PostMapping("logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     override fun logout(
-        @CurrentUserId userId: Long,
+        @CurrentUserId userId: Long?,
         @RequestBody(required = false) @Valid request: LogoutRequest?,
         req: HttpServletRequest,
         res: HttpServletResponse,
     ) {
-        authService.logout(userId, request?.deviceToken)
+        // 토큰이 없거나 유효하지 않으면 서버 상태는 건드리지 않고 쿠키만 삭제한다.
+        if (userId != null) {
+            authService.logout(userId, request?.deviceToken)
+        }
         res.setHeader(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate, max-age=0")
         res.setHeader("Pragma", "no-cache")
         res.setDateHeader("Expires", 0)

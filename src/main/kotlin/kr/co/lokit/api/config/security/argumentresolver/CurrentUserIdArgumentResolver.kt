@@ -14,22 +14,21 @@ import org.springframework.web.method.support.ModelAndViewContainer
 class CurrentUserIdArgumentResolver : HandlerMethodArgumentResolver {
     override fun supportsParameter(parameter: MethodParameter): Boolean =
         parameter.hasParameterAnnotation(CurrentUserId::class.java) &&
-            parameter.parameterType == Long::class.java
+            (parameter.parameterType == Long::class.java || parameter.parameterType == Long::class.javaObjectType)
 
     override fun resolveArgument(
         parameter: MethodParameter,
         mavContainer: ModelAndViewContainer?,
         webRequest: NativeWebRequest,
         binderFactory: WebDataBinderFactory?,
-    ): Long {
-        val authentication =
-            SecurityContextHolder.getContext().authentication
-                ?: throw BusinessException.UnauthorizedException()
+    ): Long? {
+        val authentication = SecurityContextHolder.getContext().authentication
+        val principal = authentication?.principal as? UserPrincipal
 
-        val principal =
-            authentication.principal as? UserPrincipal
-                ?: throw BusinessException.UnauthorizedException("Invalid authentication principal")
+        // Kotlin nullable(Long?) 파라미터는 인증이 없으면 null 을 받는다.
+        if (principal == null && parameter.isOptional) return null
 
-        return principal.id
+        if (authentication == null) throw BusinessException.UnauthorizedException()
+        return principal?.id ?: throw BusinessException.UnauthorizedException("Invalid authentication principal")
     }
 }

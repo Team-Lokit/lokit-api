@@ -71,6 +71,7 @@ class SecurityConfig(
                         "/auth/kakao/callback",
                         "/auth/apple",
                         "/auth/apple/callback",
+                        "/auth/logout",
                         "/emails",
                         "/emails/**",
                     ).permitAll()
