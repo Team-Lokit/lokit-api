@@ -22,7 +22,8 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
 /**
- * 수신자 = 행동한 사람의 커플 상대(사진 소유자 아님).
+ * 수신자 = 행동한 사람의 커플 상대.
+ * 단, 내 사진에 내가 단 댓글과 내 사진의 내 댓글에 단 이모지는 알림을 만들지 않는다.
  * now 파라미터는 리스너가 넘기지 않는 기본값이므로 any() 로 받는다.
  */
 @ExtendWith(MockitoExtension::class)
@@ -50,13 +51,13 @@ class CommentReactionNotificationListenerTest {
     }
 
     @Test
-    fun `내 사진에 내가 답글을 달아도 상대에게 COMMENT 알림을 요청한다`() {
+    fun `내 사진에 내가 댓글을 달면 커플을 조회하지 않고 알림도 만들지 않는다`() {
         givenPhoto(uploadedById = ACTOR_ID)
-        givenCouple(userIds = listOf(ACTOR_ID, PARTNER_ID))
 
         listener.handleCommentCreated(commentEvent())
 
-        verifyNotified(recipient = PARTNER_ID, type = NotificationType.COMMENT, emoji = null)
+        verify(coupleRepository, never()).findById(any())
+        verifyNotNotified()
     }
 
     /** 버그2 픽스: 이모지 추가 이벤트가 담고 있던 emoji 값이 그대로 dispatch 서비스까지 전달된다. */
@@ -71,13 +72,23 @@ class CommentReactionNotificationListenerTest {
     }
 
     @Test
-    fun `내 사진에 달린 상대 댓글에 내가 반응해도 상대에게 REACTION 알림을 요청한다`() {
+    fun `내 사진에 달린 상대 댓글에 내가 이모지를 달면 상대에게 REACTION 알림을 요청한다`() {
         givenPhoto(uploadedById = ACTOR_ID)
         givenCouple(userIds = listOf(ACTOR_ID, PARTNER_ID))
 
-        listener.handleEmoticonAdded(emoticonEvent())
+        listener.handleEmoticonAdded(emoticonEvent(commentAuthorUserId = PARTNER_ID))
 
         verifyNotified(recipient = PARTNER_ID, type = NotificationType.REACTION, emoji = "❤️")
+    }
+
+    @Test
+    fun `내 사진에 달린 내 댓글에 내가 이모지를 달면 커플을 조회하지 않고 알림도 만들지 않는다`() {
+        givenPhoto(uploadedById = ACTOR_ID)
+
+        listener.handleEmoticonAdded(emoticonEvent(commentAuthorUserId = ACTOR_ID))
+
+        verify(coupleRepository, never()).findById(any())
+        verifyNotNotified()
     }
 
     @Test
@@ -113,7 +124,7 @@ class CommentReactionNotificationListenerTest {
 
     @Test
     fun `커플에 상대가 없으면 알림을 만들지 않는다`() {
-        givenPhoto(uploadedById = ACTOR_ID)
+        givenPhoto(uploadedById = PARTNER_ID)
         givenCouple(userIds = listOf(ACTOR_ID))
 
         listener.handleCommentCreated(commentEvent())
@@ -167,10 +178,11 @@ class CommentReactionNotificationListenerTest {
 
     private fun commentEvent() = CommentCreatedEvent(commentId = COMMENT_ID, photoId = PHOTO_ID, actorUserId = ACTOR_ID)
 
-    private fun emoticonEvent() =
+    private fun emoticonEvent(commentAuthorUserId: Long = PARTNER_ID) =
         EmoticonAddedEvent(
             emoticonId = EMOTICON_ID,
             commentId = COMMENT_ID,
+            commentAuthorUserId = commentAuthorUserId,
             photoId = PHOTO_ID,
             actorUserId = ACTOR_ID,
             emoji = "❤️",

@@ -110,6 +110,7 @@ class CommentService(
             EmoticonAddedEvent(
                 emoticonId = saved.id,
                 commentId = commentId,
+                commentAuthorUserId = comment.userId,
                 photoId = comment.photoId,
                 actorUserId = userId,
                 emoji = emoji,

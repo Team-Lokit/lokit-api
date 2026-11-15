@@ -11,9 +11,10 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionalEventListener
 
 /**
- * 수신자 = 행동한 사람(actor)의 커플 상대. 사진 소유자가 아니다.
- * 사진 소유자 기준이면 "주인이 자기 사진에 답글을 달 때", "주인이 상대 댓글에 반응할 때"
- * 상대가 알림을 못 받는다(수신자 = actor 라 self-차단에 걸림).
+ * 수신자 = 행동한 사람(actor)의 커플 상대.
+ * 단, 사진 주인이 자기 사진에 댓글을 달거나 자기 사진의 자기 댓글에 이모지를 달면 알림을 만들지 않는다.
+ * 자기 사진에 달린 상대 댓글에 이모지를 다는 것은 상대에게 알린다.
+ * 댓글 작성 이벤트는 행동한 사람이 곧 댓글 작성자이므로 commentAuthorUserId = actorUserId 로 넘긴다.
  *
  * 커플은 사진의 coupleId 로 찾는다(actor 의 현재 커플이 아니라 사진이 속한 커플).
  * 🔴 isMember 가드는 필수다 — Couple.partnerIdFor 는 actor 가 멤버가 아니어도 userIds[0] 을
@@ -30,23 +31,24 @@ class CommentReactionNotificationListener(
     @Async
     @TransactionalEventListener
     fun handleCommentCreated(event: CommentCreatedEvent) {
-        notify(event.photoId, event.actorUserId, NotificationType.COMMENT)
+        notify(event.photoId, event.actorUserId, NotificationType.COMMENT, commentAuthorUserId = event.actorUserId)
     }
 
     @Async
     @TransactionalEventListener
     fun handleEmoticonAdded(event: EmoticonAddedEvent) {
-        notify(event.photoId, event.actorUserId, NotificationType.REACTION, event.emoji)
+        notify(event.photoId, event.actorUserId, NotificationType.REACTION, event.commentAuthorUserId, event.emoji)
     }
 
     private fun notify(
         photoId: Long,
         actorUserId: Long,
         notificationType: NotificationType,
+        commentAuthorUserId: Long,
         emoji: String? = null,
     ) {
         try {
-            val recipientUserId = resolveRecipient(photoId, actorUserId) ?: return
+            val recipientUserId = resolveRecipient(photoId, actorUserId, commentAuthorUserId) ?: return
             notificationDispatchService.notifyPhotoInteraction(
                 recipientUserId = recipientUserId,
                 actorUserId = actorUserId,
@@ -62,9 +64,15 @@ class CommentReactionNotificationListener(
     private fun resolveRecipient(
         photoId: Long,
         actorUserId: Long,
+        commentAuthorUserId: Long,
     ): Long? {
+        val photo = photoRepository.findById(photoId)
+        if (photo.uploadedById == actorUserId && commentAuthorUserId == actorUserId) {
+            log.debug("내 사진·내 댓글에 대한 내 행동이라 알림 생략: photoId={}, actorUserId={}", photoId, actorUserId)
+            return null
+        }
         val coupleId =
-            photoRepository.findById(photoId).coupleId ?: run {
+            photo.coupleId ?: run {
                 log.info("사진에 커플 정보가 없어 알림 생략: photoId={}, actorUserId={}", photoId, actorUserId)
                 return null
             }

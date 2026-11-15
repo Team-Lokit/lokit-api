@@ -10,6 +10,8 @@ data class CommentCreatedEvent(
 data class EmoticonAddedEvent(
     val emoticonId: Long,
     val commentId: Long,
+    /** 반응이 달린 댓글의 작성자. 알림 self-차단 판정에 쓴다. */
+    val commentAuthorUserId: Long,
     val photoId: Long,
     val actorUserId: Long,
     val emoji: String,
