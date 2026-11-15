@@ -1,24 +1,22 @@
 package kr.co.lokit.api.domain.notification.infrastructure
 
 import jakarta.persistence.EntityManager
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kr.co.lokit.api.domain.notification.application.port.DeviceTokenRepositoryPort
 import kr.co.lokit.api.domain.notification.domain.DevicePlatform
 import kr.co.lokit.api.fixture.createDeviceToken
+import kr.co.lokit.api.support.JpaSliceTest
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * 실 DB(H2 MODE=PostgreSQL, ddl-auto=create-drop) 실측 테스트.
  * BaseEntity 의 @SoftDelete 와 token 유니크 제약의 상호작용은 목으로 원리적으로 검증 불가하므로
  * 이 슬라이스에서 유일하게 @DataJpaTest 를 쓴다.
  */
-@DataJpaTest
-@Import(JpaDeviceTokenRepository::class)
-class DeviceTokenRepositoryTest {
+class DeviceTokenRepositoryTest : JpaSliceTest() {
     @Autowired
     lateinit var repository: DeviceTokenRepositoryPort
 

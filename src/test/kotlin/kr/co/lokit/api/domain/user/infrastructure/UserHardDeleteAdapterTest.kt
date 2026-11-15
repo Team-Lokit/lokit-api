@@ -1,6 +1,9 @@
 package kr.co.lokit.api.domain.user.infrastructure
 
 import jakarta.persistence.EntityManager
+import java.time.LocalDateTime
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kr.co.lokit.api.common.analytics.infrastructure.AppEventLogEntity
 import kr.co.lokit.api.domain.album.infrastructure.AlbumEntity
 import kr.co.lokit.api.domain.couple.domain.InviteCodeStatus
@@ -25,21 +28,15 @@ import kr.co.lokit.api.fixture.createEmoticonEntity
 import kr.co.lokit.api.fixture.createPhotoEntity
 import kr.co.lokit.api.fixture.createRefreshTokenEntity
 import kr.co.lokit.api.fixture.createUserEntity
+import kr.co.lokit.api.support.JpaSliceTest
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
-import java.time.LocalDateTime
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * @SoftDelete 필터를 우회해 행이 물리적으로 사라지는지, 실제 FK 순서로 지워지는지는 실 DB로만 검증할 수 있다.
  * 검증 쿼리도 소프트삭제 행까지 세도록 네이티브 COUNT 를 쓴다.
  */
-@DataJpaTest
-@Import(JpaUserHardDeleteAdapter::class)
-class UserHardDeleteAdapterTest {
+class UserHardDeleteAdapterTest : JpaSliceTest() {
     @Autowired
     lateinit var adapter: UserHardDeletePort
 

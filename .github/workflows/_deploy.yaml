@@ -1,0 +1,90 @@
+name: Build image & Deploy (reusable)
+
+on:
+    workflow_call:
+        inputs:
+            environment:
+                description: "dev | prod — GHCR 별칭 태그와 secrets(<ENV>_GCP_*) 접두사를 결정한다"
+                required: true
+                type: string
+            branch:
+                description: "서버에서 git pull 할 브랜치 (compose 파일 등 갱신용)"
+                required: true
+                type: string
+            jar-run-id:
+                description: "app-jar artifact 를 내려받을 workflow run id (prod 는 develop run 의 jar 를 재사용할 수 있다)"
+                required: true
+                type: string
+
+jobs:
+    # 이미지 빌드·푸시와 배포를 한 job 으로 묶어 job 기동/checkout 고정 비용을 한 번만 낸다.
+    deploy:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+            actions: read # 다른 run 의 artifact 다운로드
+        env:
+            IMAGE: ghcr.io/team-lokit/lokit-api
+
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+                with:
+                    sparse-checkout: infra/Dockerfile
+                    sparse-checkout-cone-mode: false
+
+            -   name: Download application jar
+                uses: actions/download-artifact@v4
+                with:
+                    name: app-jar
+                    path: .
+                    run-id: ${{ inputs.jar-run-id }}
+                    github-token: ${{ github.token }}
+
+            -   name: Set up Docker Buildx
+                uses: docker/setup-buildx-action@v3
+
+            -   name: Log in to GHCR
+                uses: docker/login-action@v3
+                with:
+                    registry: ghcr.io
+                    username: ${{ github.actor }}
+                    password: ${{ secrets.GITHUB_TOKEN }}
+
+            -   name: Build and push image
+                uses: docker/build-push-action@v6
+                with:
+                    context: .
+                    file: infra/Dockerfile
+                    push: true
+                    build-args: |
+                        APP_VERSION=${{ github.sha }}
+                    tags: |
+                        ${{ env.IMAGE }}:${{ inputs.environment }}
+                        ${{ env.IMAGE }}:${{ github.sha }}
+                    # dev/prod 캐시가 서로 덮어쓰지 않도록 scope 분리
+                    cache-from: type=gha,scope=${{ inputs.environment }}
+                    cache-to: type=gha,mode=max,scope=${{ inputs.environment }}
+
+            -   name: Deploy to GCP
+                uses: appleboy/ssh-action@v1.2.0
+                env:
+                    GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    GHCR_USER: ${{ github.actor }}
+                    IMAGE_TAG: ${{ github.sha }}
+                    BRANCH: ${{ inputs.branch }}
+                with:
+                    host: ${{ secrets[format('{0}_GCP_HOST', inputs.environment == 'prod' && 'PROD' || 'DEV')] }}
+                    username: ${{ secrets[format('{0}_GCP_USERNAME', inputs.environment == 'prod' && 'PROD' || 'DEV')] }}
+                    key: ${{ secrets[format('{0}_GCP_SSH_KEY', inputs.environment == 'prod' && 'PROD' || 'DEV')] }}
+                    envs: GHCR_TOKEN,GHCR_USER,IMAGE_TAG,BRANCH
+                    script: |
+                        set -e
+                        cd /lokit-api
+                        sudo git pull origin "$BRANCH"
+                        echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USER" --password-stdin
+                        sudo sh -c "APP_IMAGE_TAG=$IMAGE_TAG docker compose pull app"
+                        sudo sh -c "APP_IMAGE_TAG=$IMAGE_TAG docker compose up -d"
+                        sudo docker logout ghcr.io
+                        sudo docker image prune -f

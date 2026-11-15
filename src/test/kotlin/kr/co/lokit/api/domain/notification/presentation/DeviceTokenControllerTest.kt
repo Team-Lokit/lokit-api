@@ -1,55 +1,23 @@
 package kr.co.lokit.api.domain.notification.presentation
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import kr.co.lokit.api.config.security.CompositeAuthenticationResolver
-import kr.co.lokit.api.config.security.JwtTokenProvider
-import kr.co.lokit.api.config.web.CookieGenerator
-import kr.co.lokit.api.config.web.CookieProperties
-import kr.co.lokit.api.domain.notification.application.port.`in`.RegisterDeviceTokenUseCase
 import kr.co.lokit.api.domain.notification.domain.DevicePlatform
 import kr.co.lokit.api.domain.notification.dto.RegisterDeviceTokenRequest
-import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.fixture.createDeviceToken
 import kr.co.lokit.api.fixture.userAuth
+import kr.co.lokit.api.support.ControllerSliceTest
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@WebMvcTest(DeviceTokenController::class)
-class DeviceTokenControllerTest {
-
-    @Autowired
-    lateinit var mockMvc: MockMvc
-
+class DeviceTokenControllerTest : ControllerSliceTest() {
     val objectMapper: ObjectMapper = ObjectMapper()
-
-    @MockitoBean
-    lateinit var compositeAuthenticationResolver: CompositeAuthenticationResolver
-
-    @MockitoBean
-    lateinit var authService: AuthService
-
-    @MockitoBean
-    lateinit var jwtTokenProvider: JwtTokenProvider
-
-    @MockitoBean
-    lateinit var cookieProperties: CookieProperties
-
-    @MockitoBean
-    lateinit var cookieGenerator: CookieGenerator
-
-    @MockitoBean
-    lateinit var registerDeviceTokenUseCase: RegisterDeviceTokenUseCase
 
     @Test
     fun `디바이스 토큰 등록 성공`() {

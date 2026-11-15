@@ -5,87 +5,32 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import kr.co.lokit.api.common.constants.CoupleCookieStatus
 import kr.co.lokit.api.common.constants.DomainCookie
 import kr.co.lokit.api.common.exception.BusinessException
-import kr.co.lokit.api.config.security.CompositeAuthenticationResolver
-import kr.co.lokit.api.config.security.JwtTokenProvider
-import kr.co.lokit.api.config.web.CookieGenerator
-import kr.co.lokit.api.config.web.CookieProperties
-import kr.co.lokit.api.domain.couple.application.CoupleCommandService
-import kr.co.lokit.api.domain.couple.application.CoupleCookieStatusResolver
-import kr.co.lokit.api.domain.couple.application.port.`in`.CoupleInviteUseCase
-import kr.co.lokit.api.domain.couple.application.port.`in`.CreateCoupleUseCase
-import kr.co.lokit.api.domain.couple.application.port.`in`.DisconnectCoupleUseCase
-import kr.co.lokit.api.domain.couple.application.port.`in`.ReconnectCoupleUseCase
 import kr.co.lokit.api.domain.couple.domain.CoupleStatusReadModel
 import kr.co.lokit.api.domain.couple.domain.PartnerSummaryReadModel
-import kr.co.lokit.api.domain.user.application.AuthService
 import kr.co.lokit.api.fixture.createCoupleRequest
 import kr.co.lokit.api.fixture.createJoinCoupleRequest
 import kr.co.lokit.api.fixture.createUpdateFirstMetDateRequest
 import kr.co.lokit.api.fixture.userAuth
+import kr.co.lokit.api.support.ControllerSliceTest
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doNothing
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.doThrow
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
-import org.springframework.cache.CacheManager
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseCookie
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@WebMvcTest(CoupleController::class)
-class CoupleControllerTest {
+class CoupleControllerTest : ControllerSliceTest() {
     @Suppress("UNCHECKED_CAST")
     private fun <T> anyObject(): T = org.mockito.ArgumentMatchers.any<T>() as T
 
-    @Autowired
-    lateinit var mockMvc: MockMvc
-
     val objectMapper: ObjectMapper = ObjectMapper().registerModule(JavaTimeModule())
-
-    @MockitoBean
-    lateinit var compositeAuthenticationResolver: CompositeAuthenticationResolver
-
-    @MockitoBean
-    lateinit var authService: AuthService
-
-    @MockitoBean
-    lateinit var jwtTokenProvider: JwtTokenProvider
-
-    @MockitoBean
-    lateinit var cookieProperties: CookieProperties
-
-    @MockitoBean
-    lateinit var cookieGenerator: CookieGenerator
-
-    @MockitoBean
-    lateinit var coupleCookieStatusResolver: CoupleCookieStatusResolver
-
-    @MockitoBean
-    lateinit var createCoupleUseCase: CreateCoupleUseCase
-
-    @MockitoBean
-    lateinit var disconnectCoupleUseCase: DisconnectCoupleUseCase
-
-    @MockitoBean
-    lateinit var reconnectCoupleUseCase: ReconnectCoupleUseCase
-
-    @MockitoBean
-    lateinit var coupleInviteUseCase: CoupleInviteUseCase
-
-    @MockitoBean
-    lateinit var coupleCommandService: CoupleCommandService
-
-    @MockitoBean
-    lateinit var cacheManager: CacheManager
 
     @Test
     fun `커플 생성 엔드포인트 없음`() {

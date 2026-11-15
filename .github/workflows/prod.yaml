@@ -15,285 +15,94 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-    ci:
+    # main push 가 "develop 을 그대로 merge 한 커밋"이면, 같은 코드로 이미 돌고 있는 develop run 의
+    # 테스트 결과와 jar 를 재사용한다(중복 테스트 제거 + prod 에 develop 에서 검증된 jar 그대로 배포).
+    # 조건이 하나라도 안 맞으면 dev-run-id 를 비워 두고, 아래 ci job 이 전체 테스트를 돌린다.
+    resolve:
+        if: github.event_name == 'push'
         runs-on: ubuntu-latest
-        env:
-            DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        timeout-minutes: 25
+        permissions:
+            contents: read
+            actions: read
+        outputs:
+            dev-run-id: ${{ steps.find.outputs.dev-run-id }}
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 2 # merge 커밋의 두 부모까지
+
+            -   name: Find reusable develop run
+                id: find
+                env:
+                    GH_TOKEN: ${{ github.token }}
+                shell: bash
+                run: |
+                    set -uo pipefail
+
+                    P2="$(git rev-parse -q --verify 'HEAD^2' || true)"
+                    if [ -z "$P2" ]; then
+                        echo "merge 커밋이 아님 → 전체 CI 실행"; exit 0
+                    fi
+
+                    # jar 에 들어가는 입력만 비교한다. (infra/, .github/, compose 등 브랜치별 차이는 무시)
+                    if ! git diff --quiet "$P2" HEAD -- src build.gradle.kts settings.gradle.kts gradle.properties gradle gradlew; then
+                        echo "develop($P2) 대비 빌드 입력이 다름 → 전체 CI 실행"; exit 0
+                    fi
+
+                    # develop push 와 main push 가 거의 동시에 일어나므로 run 생성까지 잠시 기다린다.
+                    RUN_ID=""
+                    for _ in $(seq 1 18); do
+                        RUN_ID="$(gh run list -R "$GITHUB_REPOSITORY" -w dev.yaml -b develop -e push -c "$P2" -L 1 \
+                            --json databaseId -q '.[0].databaseId // empty' 2>/dev/null || true)"
+                        [ -n "$RUN_ID" ] && break
+                        sleep 5
+                    done
+                    if [ -z "$RUN_ID" ]; then
+                        echo "develop($P2) 의 Dev CI/CD run 을 찾지 못함 → 전체 CI 실행"; exit 0
+                    fi
+                    echo "develop run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RUN_ID"
+
+                    # 해당 run 의 ci job(테스트 + jar 업로드) 완료까지 대기. 배포 job 은 기다리지 않는다.
+                    while :; do
+                        STATE="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" \
+                            -q '[.jobs[] | select(.name | startswith("ci"))][0] // {} | "\(.status // "pending") \(.conclusion // "")"' 2>/dev/null || echo "pending ")"
+                        read -r STATUS CONCLUSION <<<"$STATE"
+                        if [ "$STATUS" = "completed" ]; then
+                            if [ "$CONCLUSION" = "success" ]; then
+                                echo "develop ci 성공 → 테스트 생략, jar 재사용"
+                                echo "dev-run-id=$RUN_ID" >> "$GITHUB_OUTPUT"
+                            else
+                                echo "develop ci 결과: $CONCLUSION → 전체 CI 실행"
+                            fi
+                            exit 0
+                        fi
+                        sleep 10
+                    done
+
+    ci:
+        needs: resolve
+        if: ${{ !cancelled() && (github.event_name == 'pull_request' || needs.resolve.outputs.dev-run-id == '') }}
+        uses: ./.github/workflows/_ci.yaml
+        secrets: inherit
         permissions:
             contents: read
             pull-requests: write
 
-        steps:
-            -   name: Checkout
-                uses: actions/checkout@v4
-
-            -   name: Set up Gradle
-                uses: gradle/actions/setup-gradle@v4
-
-            -   name: Set up JDK 24
-                uses: actions/setup-java@v4
-                with:
-                    java-version: '24'
-                    distribution: 'temurin'
-
-            -   name: Test & Build jar
-                run: ./gradlew test jacocoTestReport jacocoTestCoverageVerification bootJar --configuration-cache --parallel --build-cache -Dorg.gradle.configuration-cache.read-only=true -PtestMaxParallelForks=4 -PcoverageVerification=true
-
-            -   name: Package jar for artifact
-                run: cp "$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)" app.jar
-
-            -   name: Upload application jar
-                uses: actions/upload-artifact@v4
-                with:
-                    name: app-jar
-                    path: app.jar
-                    retention-days: 1
-
-            -   name: Upload JaCoCo report
-                if: always()
-                uses: actions/upload-artifact@v4
-                with:
-                    name: jacoco-report
-                    path: |
-                        build/reports/jacoco/test/html/**
-                        build/reports/jacoco/test/jacocoTestReport.xml
-
-            -   name: Build coverage summary
-                id: coverage
-                if: always()
-                shell: bash
-                run: |
-                    set -euo pipefail
-
-                    XML_PATH="build/reports/jacoco/test/jacocoTestReport.xml"
-
-                    write_outputs_zero() {
-                        echo "line_rate=0.00" >> "$GITHUB_OUTPUT"
-                        echo "branch_rate=0.00" >> "$GITHUB_OUTPUT"
-                        echo "line_covered=0" >> "$GITHUB_OUTPUT"
-                        echo "line_total=0" >> "$GITHUB_OUTPUT"
-                        echo "branch_covered=0" >> "$GITHUB_OUTPUT"
-                        echo "branch_total=0" >> "$GITHUB_OUTPUT"
-                    }
-
-                    summary_fail() {
-                        local msg="$1"
-                        {
-                            echo "### JaCoCo Coverage"
-                            echo ""
-                            echo "- ${msg}"
-                        } >> "$GITHUB_STEP_SUMMARY"
-                    }
-
-                    is_int() { [[ "${1:-}" =~ ^[0-9]+$ ]]; }
-
-                    if [ ! -f "$XML_PATH" ]; then
-                        write_outputs_zero
-                        summary_fail "리포트 생성 실패 (XML 없음: \`$XML_PATH\`)"
-                        exit 0
-                    fi
-
-                    LINE_COUNTER="$(tac "$XML_PATH" | grep -m1 '<counter type="LINE"' || true)"
-                    BRANCH_COUNTER="$(tac "$XML_PATH" | grep -m1 '<counter type="BRANCH"' || true)"
-
-                    if [ -z "$LINE_COUNTER" ] || [ -z "$BRANCH_COUNTER" ]; then
-                        write_outputs_zero
-                        summary_fail "XML 파싱 실패 (counter 없음)"
-                        exit 0
-                    fi
-
-                    LINE_MISSED="$(sed -nE 's/.*missed="([0-9]+)".*/\1/p' <<<"$LINE_COUNTER")"
-                    LINE_COVERED="$(sed -nE 's/.*covered="([0-9]+)".*/\1/p' <<<"$LINE_COUNTER")"
-                    BRANCH_MISSED="$(sed -nE 's/.*missed="([0-9]+)".*/\1/p' <<<"$BRANCH_COUNTER")"
-                    BRANCH_COVERED="$(sed -nE 's/.*covered="([0-9]+)".*/\1/p' <<<"$BRANCH_COUNTER")"
-
-                    if ! is_int "$LINE_MISSED" || ! is_int "$LINE_COVERED" || ! is_int "$BRANCH_MISSED" || ! is_int "$BRANCH_COVERED"; then
-                        write_outputs_zero
-                        summary_fail "XML 파싱 실패 (missed/covered 추출 실패)"
-                        exit 0
-                    fi
-
-                    LINE_TOTAL=$((LINE_MISSED + LINE_COVERED))
-                    BRANCH_TOTAL=$((BRANCH_MISSED + BRANCH_COVERED))
-
-                    if [ "$LINE_TOTAL" -eq 0 ]; then
-                        LINE_RATE="0.00"
-                    else
-                        LINE_RATE="$(awk -v c="$LINE_COVERED" -v t="$LINE_TOTAL" 'BEGIN { printf "%.2f", (c/t)*100 }')"
-                    fi
-
-                    if [ "$BRANCH_TOTAL" -eq 0 ]; then
-                        BRANCH_RATE="0.00"
-                    else
-                        BRANCH_RATE="$(awk -v c="$BRANCH_COVERED" -v t="$BRANCH_TOTAL" 'BEGIN { printf "%.2f", (c/t)*100 }')"
-                    fi
-
-                    echo "line_rate=$LINE_RATE" >> "$GITHUB_OUTPUT"
-                    echo "branch_rate=$BRANCH_RATE" >> "$GITHUB_OUTPUT"
-                    echo "line_covered=$LINE_COVERED" >> "$GITHUB_OUTPUT"
-                    echo "line_total=$LINE_TOTAL" >> "$GITHUB_OUTPUT"
-                    echo "branch_covered=$BRANCH_COVERED" >> "$GITHUB_OUTPUT"
-                    echo "branch_total=$BRANCH_TOTAL" >> "$GITHUB_OUTPUT"
-
-                    {
-                        echo "### JaCoCo Coverage"
-                        echo ""
-                        echo "- Line: ${LINE_RATE}% (${LINE_COVERED}/${LINE_TOTAL})"
-                        echo "- Branch: ${BRANCH_RATE}% (${BRANCH_COVERED}/${BRANCH_TOTAL})"
-                        echo "- HTML Report: workflow artifact \`jacoco-report\`"
-                    } >> "$GITHUB_STEP_SUMMARY"
-
-            -   name: Comment coverage on PR
-                if: always() && github.event_name == 'pull_request'
-                uses: actions/github-script@v7
-                with:
-                    script: |
-                        const marker = "<!-- jacoco-coverage-comment -->";
-                        const lineRate = "${{ steps.coverage.outputs.line_rate }}";
-                        const branchRate = "${{ steps.coverage.outputs.branch_rate }}";
-                        const lineCovered = "${{ steps.coverage.outputs.line_covered }}";
-                        const lineTotal = "${{ steps.coverage.outputs.line_total }}";
-                        const branchCovered = "${{ steps.coverage.outputs.branch_covered }}";
-                        const branchTotal = "${{ steps.coverage.outputs.branch_total }}";
-
-                        const body = `${marker}
-                        ### JaCoCo Coverage
-                        - Line: ${lineRate}% (${lineCovered}/${lineTotal})
-                        - Branch: ${branchRate}% (${branchCovered}/${branchTotal})
-                        - 상세 리포트: workflow artifact \`jacoco-report\``;
-
-                        const { data: comments } = await github.rest.issues.listComments({
-                            owner: context.repo.owner,
-                            repo: context.repo.repo,
-                            issue_number: context.issue.number,
-                        });
-                        const existing = comments.find((c) => c.user.type === "Bot" && c.body.includes(marker));
-                        if (existing) {
-                            await github.rest.issues.updateComment({
-                                owner: context.repo.owner,
-                                repo: context.repo.repo,
-                                comment_id: existing.id,
-                                body,
-                            });
-                        } else {
-                            await github.rest.issues.createComment({
-                                owner: context.repo.owner,
-                                repo: context.repo.repo,
-                                issue_number: context.issue.number,
-                                body,
-                            });
-                        }
-
-            -   name: Notify Discord (CI)
-                if: always() && env.DISCORD_WEBHOOK_URL != ''
-                env:
-                    LINE_RATE: ${{ steps.coverage.outputs.line_rate }}
-                    BRANCH_RATE: ${{ steps.coverage.outputs.branch_rate }}
-                    GITHUB_EVENT_NAME: ${{ github.event_name }}
-                    GITHUB_REF_NAME: ${{ github.ref_name }}
-                    GITHUB_REPOSITORY: ${{ github.repository }}
-                    GITHUB_SERVER_URL: ${{ github.server_url }}
-                    GITHUB_RUN_ID: ${{ github.run_id }}
-                shell: bash
-                run: |
-                    set -euo pipefail
-
-                    RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-
-                    MSG=$'CI 완료 ('"${GITHUB_EVENT_NAME}"$')\n'"- Branch: ${GITHUB_REF_NAME}"$'\n'"- Line Coverage: ${LINE_RATE:-N/A}%"$'\n'"- Branch Coverage: ${BRANCH_RATE:-N/A}%"$'\n'"- Run: ${RUN_URL}"
-
-                    payload="$(jq -n --arg username "GitHub" --arg content "$MSG" '{username:$username, content:$content}')"
-
-                    echo "Discord payload bytes: $(printf %s "$payload" | wc -c)"
-                    echo "Discord message bytes: $(printf %s "$MSG" | wc -c)"
-
-                    http_code="$(
-                        curl -sS -X POST "$DISCORD_WEBHOOK_URL" \
-                            -H "Content-Type: application/json" \
-                            -d "$payload" \
-                            -o /tmp/discord_resp.json \
-                            -w "%{http_code}" || true
-                    )"
-
-                    echo "Discord HTTP: $http_code"
-                    if [ -s /tmp/discord_resp.json ]; then
-                        echo "Discord response:"
-                        cat /tmp/discord_resp.json
-                        echo ""
-                    fi
-
-                    if [ "$http_code" != "204" ]; then
-                        exit 1
-                    fi
-
-
-
-    build-and-push:
-        needs: ci
-        if: github.event_name == 'push'
-        runs-on: ubuntu-latest
+    deploy:
+        needs: [ resolve, ci ]
+        if: >-
+            ${{ !cancelled() && github.event_name == 'push' &&
+                (needs.ci.result == 'success' ||
+                 (needs.ci.result == 'skipped' && needs.resolve.outputs.dev-run-id != '')) }}
+        uses: ./.github/workflows/_deploy.yaml
+        secrets: inherit
         permissions:
             contents: read
             packages: write
-
-        steps:
-            -   name: Checkout
-                uses: actions/checkout@v4
-
-            -   name: Download application jar
-                uses: actions/download-artifact@v4
-                with:
-                    name: app-jar
-                    path: .
-
-            -   name: Set up Docker Buildx
-                uses: docker/setup-buildx-action@v3
-
-            -   name: Log in to GHCR
-                uses: docker/login-action@v3
-                with:
-                    registry: ghcr.io
-                    username: ${{ github.actor }}
-                    password: ${{ secrets.GITHUB_TOKEN }}
-
-            -   name: Build and push image
-                uses: docker/build-push-action@v6
-                with:
-                    context: .
-                    file: infra/Dockerfile
-                    push: true
-                    tags: |
-                        ghcr.io/team-lokit/lokit-api:prod
-                        ghcr.io/team-lokit/lokit-api:${{ github.sha }}
-                    cache-from: type=gha
-                    cache-to: type=gha,mode=max
-
-    deploy:
-        needs: build-and-push
-        if: github.event_name == 'push'
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            packages: read
-
-        steps:
-            -   name: Deploy to GCP
-                uses: appleboy/ssh-action@v1.2.0
-                env:
-                    GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                    GHCR_USER: ${{ github.actor }}
-                    IMAGE_TAG: ${{ github.sha }}
-                with:
-                    host: ${{ secrets.PROD_GCP_HOST }}
-                    username: ${{ secrets.PROD_GCP_USERNAME }}
-                    key: ${{ secrets.PROD_GCP_SSH_KEY }}
-                    envs: GHCR_TOKEN,GHCR_USER,IMAGE_TAG
-                    script: |
-                        set -e
-                        cd /lokit-api
-                        sudo git pull origin main
-                        echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USER" --password-stdin
-                        sudo sh -c "APP_IMAGE_TAG=$IMAGE_TAG docker compose pull app"
-                        sudo sh -c "APP_IMAGE_TAG=$IMAGE_TAG docker compose up -d"
-                        sudo docker logout ghcr.io
-                        sudo docker image prune -f
+            actions: read
+        with:
+            environment: prod
+            branch: main
+            jar-run-id: ${{ needs.resolve.outputs.dev-run-id || github.run_id }}

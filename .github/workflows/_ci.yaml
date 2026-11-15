@@ -1,0 +1,188 @@
+name: CI (reusable)
+
+# 테스트 + 커버리지 + bootJar 빌드. 결과 jar 는 `app-jar` artifact 로 업로드되어
+# 같은 run(또는 prod 의 경우 develop run)의 배포 job 에서 재사용된다.
+on:
+    workflow_call:
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        env:
+            DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        permissions:
+            contents: read
+            pull-requests: write
+
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+
+            -   name: Set up JDK 24
+                uses: actions/setup-java@v4
+                with:
+                    java-version: '24'
+                    distribution: 'temurin'
+
+            -   name: Set up Gradle
+                uses: gradle/actions/setup-gradle@v4
+                with:
+                    # 기본값은 기본 브랜치(main)에서만 캐시를 저장한다. develop push 도 저장해야
+                    # 다음 run 에서 build cache / configuration cache 를 재사용할 수 있다.
+                    cache-read-only: ${{ github.event_name == 'pull_request' }}
+                    # configuration cache 는 암호화 키가 있어야 runner 간에 저장·복원된다.
+                    cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+            # --configuration-cache / --build-cache / --parallel 은 gradle.properties 에서 이미 켜져 있다.
+            -   name: Test & Build jar
+                run: ./gradlew test jacocoTestReport jacocoTestCoverageVerification bootJar -PtestMaxParallelForks=2 -PcoverageVerification=true
+
+            -   name: Package jar for artifact
+                run: cp "$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)" app.jar
+
+            -   name: Upload application jar
+                uses: actions/upload-artifact@v4
+                with:
+                    name: app-jar
+                    path: app.jar
+                    retention-days: 1
+                    # jar 는 이미 압축 포맷이라 재압축해도 이득이 거의 없다.
+                    compression-level: 0
+
+            -   name: Upload JaCoCo report
+                if: always()
+                uses: actions/upload-artifact@v4
+                with:
+                    name: jacoco-report
+                    path: |
+                        build/reports/jacoco/test/html/**
+                        build/reports/jacoco/test/jacocoTestReport.xml
+                    retention-days: 7
+
+            -   name: Build coverage summary
+                id: coverage
+                if: always()
+                shell: bash
+                run: |
+                    set -euo pipefail
+
+                    XML_PATH="build/reports/jacoco/test/jacocoTestReport.xml"
+
+                    write_outputs_zero() {
+                        {
+                            echo "line_rate=0.00"
+                            echo "branch_rate=0.00"
+                            echo "line_covered=0"
+                            echo "line_total=0"
+                            echo "branch_covered=0"
+                            echo "branch_total=0"
+                        } >> "$GITHUB_OUTPUT"
+                    }
+
+                    summary_fail() {
+                        printf '### JaCoCo Coverage\n\n- %s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+                    }
+
+                    is_int() { [[ "${1:-}" =~ ^[0-9]+$ ]]; }
+
+                    if [ ! -f "$XML_PATH" ]; then
+                        write_outputs_zero
+                        summary_fail "리포트 생성 실패 (XML 없음: \`$XML_PATH\`)"
+                        exit 0
+                    fi
+
+                    LINE_COUNTER="$(tac "$XML_PATH" | grep -m1 '<counter type="LINE"' || true)"
+                    BRANCH_COUNTER="$(tac "$XML_PATH" | grep -m1 '<counter type="BRANCH"' || true)"
+
+                    if [ -z "$LINE_COUNTER" ] || [ -z "$BRANCH_COUNTER" ]; then
+                        write_outputs_zero
+                        summary_fail "XML 파싱 실패 (counter 없음)"
+                        exit 0
+                    fi
+
+                    LINE_MISSED="$(sed -nE 's/.*missed="([0-9]+)".*/\1/p' <<<"$LINE_COUNTER")"
+                    LINE_COVERED="$(sed -nE 's/.*covered="([0-9]+)".*/\1/p' <<<"$LINE_COUNTER")"
+                    BRANCH_MISSED="$(sed -nE 's/.*missed="([0-9]+)".*/\1/p' <<<"$BRANCH_COUNTER")"
+                    BRANCH_COVERED="$(sed -nE 's/.*covered="([0-9]+)".*/\1/p' <<<"$BRANCH_COUNTER")"
+
+                    if ! is_int "$LINE_MISSED" || ! is_int "$LINE_COVERED" || ! is_int "$BRANCH_MISSED" || ! is_int "$BRANCH_COVERED"; then
+                        write_outputs_zero
+                        summary_fail "XML 파싱 실패 (missed/covered 추출 실패)"
+                        exit 0
+                    fi
+
+                    LINE_TOTAL=$((LINE_MISSED + LINE_COVERED))
+                    BRANCH_TOTAL=$((BRANCH_MISSED + BRANCH_COVERED))
+
+                    rate() { awk -v c="$1" -v t="$2" 'BEGIN { if (t == 0) printf "0.00"; else printf "%.2f", (c/t)*100 }'; }
+                    LINE_RATE="$(rate "$LINE_COVERED" "$LINE_TOTAL")"
+                    BRANCH_RATE="$(rate "$BRANCH_COVERED" "$BRANCH_TOTAL")"
+
+                    {
+                        echo "line_rate=$LINE_RATE"
+                        echo "branch_rate=$BRANCH_RATE"
+                        echo "line_covered=$LINE_COVERED"
+                        echo "line_total=$LINE_TOTAL"
+                        echo "branch_covered=$BRANCH_COVERED"
+                        echo "branch_total=$BRANCH_TOTAL"
+                    } >> "$GITHUB_OUTPUT"
+
+                    {
+                        echo "### JaCoCo Coverage"
+                        echo ""
+                        echo "- Line: ${LINE_RATE}% (${LINE_COVERED}/${LINE_TOTAL})"
+                        echo "- Branch: ${BRANCH_RATE}% (${BRANCH_COVERED}/${BRANCH_TOTAL})"
+                        echo "- HTML Report: workflow artifact \`jacoco-report\`"
+                    } >> "$GITHUB_STEP_SUMMARY"
+
+            -   name: Comment coverage on PR
+                if: always() && github.event_name == 'pull_request'
+                continue-on-error: true
+                uses: actions/github-script@v7
+                with:
+                    script: |
+                        const marker = "<!-- jacoco-coverage-comment -->";
+                        const o = ${{ toJSON(steps.coverage.outputs) }};
+
+                        const body = `${marker}
+                        ### JaCoCo Coverage
+                        - Line: ${o.line_rate}% (${o.line_covered}/${o.line_total})
+                        - Branch: ${o.branch_rate}% (${o.branch_covered}/${o.branch_total})
+                        - 상세 리포트: workflow artifact \`jacoco-report\``;
+
+                        const { owner, repo } = context.repo;
+                        const issue_number = context.issue.number;
+                        const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+                        const existing = comments.find((c) => c.user.type === "Bot" && c.body.includes(marker));
+                        if (existing) {
+                            await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+                        } else {
+                            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+                        }
+
+            # 알림 실패가 CI 결과(=배포 여부)에 영향을 주지 않도록 continue-on-error.
+            -   name: Notify Discord (CI)
+                if: always() && env.DISCORD_WEBHOOK_URL != ''
+                continue-on-error: true
+                env:
+                    JOB_STATUS: ${{ job.status }}
+                    LINE_RATE: ${{ steps.coverage.outputs.line_rate }}
+                    BRANCH_RATE: ${{ steps.coverage.outputs.branch_rate }}
+                    RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                shell: bash
+                run: |
+                    set -euo pipefail
+
+                    case "$JOB_STATUS" in
+                        success) TITLE="CI 성공 ✅" ;;
+                        cancelled) TITLE="CI 취소 ⚪" ;;
+                        *) TITLE="CI 실패 ❌" ;;
+                    esac
+
+                    MSG="$(printf '%s (%s)\n- Branch: %s\n- Commit: %s\n- Line Coverage: %s%%\n- Branch Coverage: %s%%\n- Run: %s' \
+                        "$TITLE" "$GITHUB_EVENT_NAME" "$GITHUB_REF_NAME" "${GITHUB_SHA:0:7}" \
+                        "${LINE_RATE:-N/A}" "${BRANCH_RATE:-N/A}" "$RUN_URL")"
+
+                    jq -n --arg content "$MSG" '{username:"GitHub", content:$content}' \
+                        | curl -sS --fail-with-body --retry 2 -X POST "$DISCORD_WEBHOOK_URL" \
+                            -H "Content-Type: application/json" --data-binary @-

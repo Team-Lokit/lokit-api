@@ -1,61 +1,26 @@
 package kr.co.lokit.api.domain.user.presentation
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import kr.co.lokit.api.config.security.CompositeAuthenticationResolver
-import kr.co.lokit.api.config.security.JwtTokenProvider
-import kr.co.lokit.api.config.web.CookieGenerator
-import kr.co.lokit.api.config.web.CookieProperties
-import kr.co.lokit.api.domain.user.application.AuthService
-import kr.co.lokit.api.domain.user.application.port.`in`.GetMyPageUseCase
-import kr.co.lokit.api.domain.user.application.port.`in`.UpdateMyPageUseCase
 import kr.co.lokit.api.domain.user.dto.UpdateNicknameRequest
 import kr.co.lokit.api.domain.user.dto.UpdateProfileImageRequest
 import kr.co.lokit.api.fixture.createUpdateNicknameRequest
 import kr.co.lokit.api.fixture.createUpdateProfileImageRequest
 import kr.co.lokit.api.fixture.createUser
 import kr.co.lokit.api.fixture.userAuth
+import kr.co.lokit.api.support.ControllerSliceTest
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doReturn
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@WebMvcTest(MyPageController::class)
-class MyPageControllerTest {
-    @Autowired
-    lateinit var mockMvc: MockMvc
-
+class MyPageControllerTest : ControllerSliceTest() {
     val objectMapper: ObjectMapper = ObjectMapper()
-
-    @MockitoBean
-    lateinit var compositeAuthenticationResolver: CompositeAuthenticationResolver
-
-    @MockitoBean
-    lateinit var authService: AuthService
-
-    @MockitoBean
-    lateinit var jwtTokenProvider: JwtTokenProvider
-
-    @MockitoBean
-    lateinit var cookieProperties: CookieProperties
-
-    @MockitoBean
-    lateinit var cookieGenerator: CookieGenerator
-
-    @MockitoBean
-    lateinit var updateMyPageUseCase: UpdateMyPageUseCase
-
-    @MockitoBean
-    lateinit var getMyPageUseCase: GetMyPageUseCase
 
     @Test
     fun `닉네임 수정 성공`() {

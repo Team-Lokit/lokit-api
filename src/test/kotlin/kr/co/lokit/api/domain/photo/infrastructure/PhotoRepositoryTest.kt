@@ -1,6 +1,9 @@
 package kr.co.lokit.api.domain.photo.infrastructure
 
 import jakarta.persistence.EntityManager
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.domain.album.infrastructure.AlbumEntity
 import kr.co.lokit.api.domain.album.infrastructure.AlbumJpaRepository
@@ -14,24 +17,19 @@ import kr.co.lokit.api.fixture.createAlbumEntity
 import kr.co.lokit.api.fixture.createCoupleEntity
 import kr.co.lokit.api.fixture.createPhotoEntity
 import kr.co.lokit.api.fixture.createUserEntity
+import kr.co.lokit.api.support.JpaSliceTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 /**
  * D6/B16 실측. IN 쿼리 + BaseEntity 의 @SoftDelete 자동 필터 + JOIN FETCH 의 상호작용은
  * 목으로 원리적으로 검증 불가하므로 @DataJpaTest 를 쓴다(T6).
  * PhotoEntity.url 은 unique 제약이므로 사진마다 서로 다른 url 을 준다.
  */
-@DataJpaTest
-@Import(JpaPhotoRepository::class)
-class PhotoRepositoryTest {
+class PhotoRepositoryTest : JpaSliceTest() {
     @Autowired
     lateinit var repository: PhotoRepositoryPort
 

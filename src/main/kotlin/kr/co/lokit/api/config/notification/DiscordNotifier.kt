@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Profile
 import org.springframework.context.event.EventListener
+import org.springframework.core.env.Environment
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -25,7 +26,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 @Profile("!local")
 class DiscordNotifier(
     @Value("\${discord.webhook.url}") private val webhookUrl: String,
-    @Value("\${discord.lifecycle.enabled:false}") private val lifecycleNotificationEnabled: Boolean,
+    @Value("\${discord.lifecycle.deployment-enabled:false}") private val deploymentNotificationEnabled: Boolean,
+    @Value("\${discord.lifecycle.shutdown-enabled:false}") private val shutdownNotificationEnabled: Boolean,
+    @Value("\${APP_VERSION:unknown}") private val appVersion: String,
+    private val environment: Environment,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val restClient =
@@ -76,7 +80,7 @@ class DiscordNotifier(
 
     @PreDestroy
     fun notifyShutdown() {
-        if (!lifecycleNotificationEnabled) {
+        if (!shutdownNotificationEnabled) {
             return
         }
         if (!shutdownNotified.compareAndSet(false, true)) {
@@ -104,9 +108,13 @@ class DiscordNotifier(
         }
     }
 
+    /**
+     * 컨테이너가 트래픽을 받을 준비가 된 시점(ApplicationReadyEvent)에 배포 완료를 알린다.
+     * `@PostConstruct` 는 빈 초기화 시점이라 웹 서버 기동/헬스체크 전에 불릴 수 있어 쓰지 않는다.
+     */
     @EventListener(ApplicationReadyEvent::class)
     fun notifyDeployment() {
-        if (!lifecycleNotificationEnabled) {
+        if (!deploymentNotificationEnabled) {
             return
         }
         if (!deploymentNotified.compareAndSet(false, true)) {
@@ -114,26 +122,30 @@ class DiscordNotifier(
         }
         Thread.startVirtualThread {
             try {
-                val timestamp = KST_FORMATTER.format(Instant.now())
-                val payload =
-                    mapOf(
-                        "embeds" to
-                            listOf(
-                                mapOf(
-                                    "title" to "서버 배포 완료",
-                                    "color" to 0x00FF00,
-                                    "fields" to
-                                        listOf(
-                                            mapOf("name" to "Timestamp", "value" to timestamp, "inline" to false),
-                                        ),
-                                ),
-                            ),
-                    )
-                sendWebhookWithRetry(payload, "deployment")
+                sendWebhookWithRetry(deploymentPayload(Instant.now()), "deployment")
             } catch (e: Exception) {
                 log.warn("Discord 배포 알림 전송 실패: ${e.message}")
             }
         }
+    }
+
+    internal fun deploymentPayload(now: Instant): Map<String, Any> {
+        val profiles = environment.activeProfiles.joinToString(",").ifEmpty { "default" }
+        return mapOf(
+            "embeds" to
+                listOf(
+                    mapOf(
+                        "title" to "서버 배포 완료 ($profiles)",
+                        "color" to 0x00FF00,
+                        "fields" to
+                            listOf(
+                                mapOf("name" to "Version", "value" to appVersion.take(7), "inline" to true),
+                                mapOf("name" to "Profile", "value" to profiles, "inline" to true),
+                                mapOf("name" to "Timestamp", "value" to KST_FORMATTER.format(now), "inline" to false),
+                            ),
+                    ),
+                ),
+        )
     }
 
     fun notify(

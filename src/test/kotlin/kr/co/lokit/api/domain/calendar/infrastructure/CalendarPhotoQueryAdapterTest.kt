@@ -1,6 +1,8 @@
 package kr.co.lokit.api.domain.calendar.infrastructure
 
 import jakarta.persistence.EntityManager
+import java.time.LocalDateTime
+import kotlin.test.assertEquals
 import kr.co.lokit.api.domain.album.infrastructure.AlbumEntity
 import kr.co.lokit.api.domain.album.infrastructure.AlbumJpaRepository
 import kr.co.lokit.api.domain.calendar.application.port.CalendarPhotoQueryPort
@@ -14,20 +16,16 @@ import kr.co.lokit.api.fixture.createAlbumEntity
 import kr.co.lokit.api.fixture.createCoupleEntity
 import kr.co.lokit.api.fixture.createPhotoEntity
 import kr.co.lokit.api.fixture.createUserEntity
+import kr.co.lokit.api.support.JpaSliceTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
-import java.time.LocalDateTime
-import kotlin.test.assertEquals
 
 /**
  * 커플 범위·소프트삭제 필터·반열린 구간·정렬은 실제 쿼리로만 검증 가능하므로 @DataJpaTest 를 쓴다.
  */
-@DataJpaTest
-@Import(JpaCalendarPhotoQueryAdapter::class)
-class CalendarPhotoQueryAdapterTest {
+class CalendarPhotoQueryAdapterTest : JpaSliceTest() {
     @Autowired
     lateinit var adapter: CalendarPhotoQueryPort
 

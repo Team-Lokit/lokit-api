@@ -124,7 +124,8 @@ discord:
     webhook:
         url: ${DISCORD_WEBHOOK_URL:}
     lifecycle:
-        enabled: false
+        deployment-enabled: ${DISCORD_DEPLOYMENT_NOTIFICATION_ENABLED:false}
+        shutdown-enabled: false
 
 admin.key: ${ADMIN_KEY:}
 

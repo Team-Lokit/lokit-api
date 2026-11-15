@@ -1,17 +1,16 @@
 package kr.co.lokit.api.domain.notification.infrastructure
 
 import jakarta.persistence.EntityManager
-import kr.co.lokit.api.domain.notification.application.port.PendingUploadNotificationRepositoryPort
-import kr.co.lokit.api.fixture.createPendingUploadNotification
-import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kr.co.lokit.api.domain.notification.application.port.PendingUploadNotificationRepositoryPort
+import kr.co.lokit.api.fixture.createPendingUploadNotification
+import kr.co.lokit.api.support.JpaSliceTest
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 
 /**
  * 실 DB(H2 MODE=PostgreSQL, ddl-auto=create-drop) 실측 테스트.
@@ -25,9 +24,7 @@ import kotlin.test.assertTrue
  * - HQL delete 가 `@SoftDelete` 로 UPDATE 재작성되는가(F16) — 취소한 배치만 사라지고
  *   물리 행은 남으며, 다른 커플/이미 발송된 배치는 영향받지 않는가.
  */
-@DataJpaTest
-@Import(JpaPendingUploadNotificationRepository::class)
-class PendingUploadNotificationRepositoryTest {
+class PendingUploadNotificationRepositoryTest : JpaSliceTest() {
     @Autowired
     lateinit var repository: PendingUploadNotificationRepositoryPort
 
