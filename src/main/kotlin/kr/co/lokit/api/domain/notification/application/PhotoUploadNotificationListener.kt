@@ -28,6 +28,15 @@ class PhotoUploadNotificationListener(
             val couple =
                 coupleRepository.findById(event.coupleId)
                     ?.takeIf { it.userIds.contains(event.uploaderUserId) } ?: return
+            if (!couple.isConnected()) {
+                log.info(
+                    "연결이 끊긴 커플이라 업로드 알림 생략: coupleId={}, status={}, photoId={}",
+                    event.coupleId,
+                    couple.status,
+                    event.photoId,
+                )
+                return
+            }
             val recipientUserId = couple.partnerIdFor(event.uploaderUserId) ?: return
             uploadNotificationService.schedule(
                 coupleId = event.coupleId,

@@ -5,6 +5,7 @@ import kr.co.lokit.api.domain.notification.domain.PushSendResult
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
@@ -50,6 +51,8 @@ class FcmPushSenderAdapterTest {
                     credentialsLocation = "",
                     connectTimeoutMillis = 5_000,
                     readTimeoutMillis = 10_000,
+                    retryMaxAttempts = MAX_ATTEMPTS,
+                    retryBackoffMillis = 0,
                 ),
                 accessTokenProvider = accessTokenProvider,
                 restClient = builder.build(),
@@ -155,9 +158,9 @@ class FcmPushSenderAdapterTest {
      * failedTokens 와 invalidTokens 를 갈라 놓는 이유가 바로 이 구분이다.
      */
     @Test
-    fun `500 응답이면 재시도 가능 실패로 분류하고 예외를 던지지 않는다`() {
+    fun `500 응답이 계속되면 최대 횟수까지 재시도한 뒤 실패로 분류하고 예외를 던지지 않는다`() {
         whenever(accessTokenProvider.accessToken()).thenReturn(ACCESS_TOKEN)
-        server.expect(requestTo(SEND_URL)).andRespond(withServerError())
+        server.expect(times(MAX_ATTEMPTS), requestTo(SEND_URL)).andRespond(withServerError())
 
         val result = adapter.send(PushMessage(tokens = listOf(TOKEN_1), title = TITLE, body = BODY))
 
@@ -172,7 +175,7 @@ class FcmPushSenderAdapterTest {
      * 전체를 failedTokens 로 표시하고 정상 반환한다. 요청은 1건도 나가면 안 된다.
      */
     @Test
-    fun `액세스 토큰 발급이 실패하면 전체를 실패로 표시하고 예외를 던지지 않는다`() {
+    fun `액세스 토큰 발급이 계속 실패하면 전체를 실패로 표시하고 예외를 던지지 않는다`() {
         whenever(accessTokenProvider.accessToken()).thenThrow(IllegalStateException("서비스 계정 키를 읽을 수 없습니다."))
 
         val result = adapter.send(
@@ -183,12 +186,74 @@ class FcmPushSenderAdapterTest {
         assertEquals(listOf(TOKEN_1, TOKEN_2, TOKEN_3), result.failedTokens)
         assertTrue(result.successTokens.isEmpty())
         assertTrue(result.invalidTokens.isEmpty())
+        verify(accessTokenProvider, org.mockito.kotlin.times(MAX_ATTEMPTS)).accessToken()
+    }
+
+    @Test
+    fun `500 뒤에 성공하면 성공으로 분류한다`() {
+        whenever(accessTokenProvider.accessToken()).thenReturn(ACCESS_TOKEN)
+        server.expect(requestTo(SEND_URL)).andRespond(withServerError())
+        server.expect(requestTo(SEND_URL)).andRespond(withSuccess())
+
+        val result = adapter.send(PushMessage(tokens = listOf(TOKEN_1), title = TITLE, body = BODY))
+
+        server.verify()
+        assertEquals(listOf(TOKEN_1), result.successTokens)
+        assertTrue(result.failedTokens.isEmpty())
+    }
+
+    @Test
+    fun `429 응답이면 재시도한다`() {
+        whenever(accessTokenProvider.accessToken()).thenReturn(ACCESS_TOKEN)
+        server.expect(requestTo(SEND_URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
+        server.expect(requestTo(SEND_URL)).andRespond(withSuccess())
+
+        val result = adapter.send(PushMessage(tokens = listOf(TOKEN_1), title = TITLE, body = BODY))
+
+        server.verify()
+        assertEquals(listOf(TOKEN_1), result.successTokens)
+    }
+
+    @Test
+    fun `401 응답이면 액세스 토큰을 무효화하고 새 토큰으로 재시도한다`() {
+        whenever(accessTokenProvider.accessToken()).thenReturn(ACCESS_TOKEN, REFRESHED_ACCESS_TOKEN)
+        server.expect(requestTo(SEND_URL))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer $ACCESS_TOKEN"))
+            .andRespond(withStatus(HttpStatus.UNAUTHORIZED))
+        server.expect(requestTo(SEND_URL))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer $REFRESHED_ACCESS_TOKEN"))
+            .andRespond(withSuccess())
+        // 다음 기기는 재발급된 토큰을 그대로 쓴다(추가 발급 없음).
+        server.expect(requestTo(SEND_URL))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer $REFRESHED_ACCESS_TOKEN"))
+            .andRespond(withSuccess())
+
+        val result = adapter.send(PushMessage(tokens = listOf(TOKEN_1, TOKEN_2), title = TITLE, body = BODY))
+
+        server.verify()
+        verify(accessTokenProvider).invalidate()
+        assertEquals(listOf(TOKEN_1, TOKEN_2), result.successTokens)
+    }
+
+    @Test
+    fun `액세스 토큰 발급이 일시적으로 실패해도 재시도로 발급되면 발송한다`() {
+        whenever(accessTokenProvider.accessToken())
+            .thenThrow(IllegalStateException("일시 장애"))
+            .thenReturn(ACCESS_TOKEN)
+        server.expect(requestTo(SEND_URL)).andRespond(withSuccess())
+
+        val result = adapter.send(PushMessage(tokens = listOf(TOKEN_1), title = TITLE, body = BODY))
+
+        server.verify()
+        assertEquals(listOf(TOKEN_1), result.successTokens)
     }
 
     companion object {
         private const val PROJECT_ID = "test-project"
         private const val SEND_URL = "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send"
         private const val ACCESS_TOKEN = "test-access-token"
+        private const val REFRESHED_ACCESS_TOKEN = "refreshed-access-token"
+        private const val MAX_ATTEMPTS = 3
         private const val TITLE = "제목"
         private const val BODY = "본문"
         private const val TOKEN_1 = "device-token-1"

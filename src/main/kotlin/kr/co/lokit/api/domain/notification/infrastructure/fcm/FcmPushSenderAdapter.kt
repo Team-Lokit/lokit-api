@@ -11,12 +11,22 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.stereotype.Component
+import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientResponseException
 import tools.jackson.databind.json.JsonMapper
 
 /**
  * FCM HTTP v1은 토큰 1건씩만 전송(D3). 어떤 경우에도 예외를 던지지 않고 PushSendResult로 반환.
- * 무효 판정은 404 + error.details[].errorCode == "UNREGISTERED" 만 invalidTokens(삭제 대상), 그 외 404·400 은 failedTokens.
+ *
+ * 응답 분류:
+ * - 2xx → 성공
+ * - 404 + error.details[].errorCode == "UNREGISTERED" → invalidTokens(삭제 대상). 재시도 없음.
+ * - 401 → 액세스 토큰 무효화 후 재시도
+ * - 429·5xx·네트워크 오류(타임아웃 등) → 지수 백오프 재시도. 소진하면 failedTokens.
+ * - 그 외 4xx(400 INVALID_ARGUMENT, 403, UNREGISTERED 아닌 404 …) → 재시도해도 같으므로 즉시 failedTokens.
+ * 액세스 토큰 발급 실패도 같은 횟수만큼 재시도하고, 소진하면 전체를 failedTokens 로 반환한다.
+ *
  * restClient를 기본값 파라미터로 둔 이유(F14): 컨텍스트에 RestClient 빈이 없어 안전.
  * 테스트: RestClient.builder() + MockRestServiceServer.bindTo(builder) 로 실제 네트워크 없이 검증.
  */
@@ -30,29 +40,104 @@ class FcmPushSenderAdapter(
 ) : PushSenderPort {
     private val log = LoggerFactory.getLogger(javaClass)
 
+    private val maxAttempts: Int get() = properties.retryMaxAttempts.coerceAtLeast(1)
+
     override fun send(message: PushMessage): PushSendResult {
         if (message.tokens.isEmpty()) return PushSendResult.EMPTY
-        val accessToken =
-            runCatching { accessTokenProvider.accessToken() }
-                .getOrElse { e ->
-                    log.warn("FCM 액세스 토큰 발급 실패 — 전체 발송 생략", e)
-                    return PushSendResult(failedTokens = message.tokens)
-                }
+        var accessToken =
+            obtainAccessToken() ?: run {
+                log.error("FCM 액세스 토큰 발급 최종 실패 — 전체 발송 생략: tokens={}", message.tokens.size)
+                return PushSendResult(failedTokens = message.tokens)
+            }
 
         val success = mutableListOf<String>()
         val failed = mutableListOf<String>()
         val invalid = mutableListOf<String>()
         message.tokens.forEach { token ->
-            when (sendSingle(token, message, accessToken)) {
+            val (outcome, latestAccessToken) = sendWithRetry(token, message, accessToken)
+            accessToken = latestAccessToken
+            when (outcome) {
                 SendOutcome.SUCCESS -> success.add(token)
                 SendOutcome.INVALID_TOKEN -> invalid.add(token)
-                SendOutcome.RETRYABLE_FAILURE -> failed.add(token)
+                SendOutcome.FAILED -> failed.add(token)
             }
         }
         return PushSendResult(successTokens = success, failedTokens = failed, invalidTokens = invalid)
     }
 
-    private fun sendSingle(token: String, message: PushMessage, accessToken: String): SendOutcome =
+    private fun obtainAccessToken(): String? {
+        for (attempt in 1..maxAttempts) {
+            try {
+                return accessTokenProvider.accessToken()
+            } catch (e: Exception) {
+                log.warn("FCM 액세스 토큰 발급 실패 — 시도 {}/{}", attempt, maxAttempts, e)
+                if (attempt < maxAttempts) sleepBackoff(attempt)
+            }
+        }
+        return null
+    }
+
+    /** 반환값의 두 번째 원소는 401 재발급으로 바뀌었을 수 있는 최신 액세스 토큰이다(다음 토큰 발송에 재사용). */
+    private fun sendWithRetry(
+        token: String,
+        message: PushMessage,
+        initialAccessToken: String,
+    ): Pair<SendOutcome, String> {
+        var accessToken = initialAccessToken
+        val tokenSuffix = token.takeLast(TOKEN_LOG_SUFFIX_LENGTH)
+        for (attempt in 1..maxAttempts) {
+            val result = sendSingle(token, message, accessToken)
+            when (result) {
+                is SingleResult.Success -> return SendOutcome.SUCCESS to accessToken
+                is SingleResult.Invalid -> {
+                    log.info("FCM 무효 토큰(UNREGISTERED): tokenSuffix={}", tokenSuffix)
+                    return SendOutcome.INVALID_TOKEN to accessToken
+                }
+                is SingleResult.Permanent -> {
+                    log.warn(
+                        "FCM 발송 실패(재시도 불가): tokenSuffix={}, status={}, reason={}",
+                        tokenSuffix,
+                        result.status,
+                        result.reason,
+                    )
+                    return SendOutcome.FAILED to accessToken
+                }
+                is SingleResult.Retryable -> {
+                    if (attempt == maxAttempts) {
+                        log.error(
+                            "FCM 발송 최종 실패 — 재시도 소진: tokenSuffix={}, attempts={}, status={}, reason={}",
+                            tokenSuffix,
+                            attempt,
+                            result.status,
+                            result.reason,
+                            result.cause,
+                        )
+                        return SendOutcome.FAILED to accessToken
+                    }
+                    log.warn(
+                        "FCM 발송 일시 실패 — 재시도 {}/{}: tokenSuffix={}, status={}, reason={}",
+                        attempt,
+                        maxAttempts,
+                        tokenSuffix,
+                        result.status,
+                        result.reason,
+                    )
+                    if (result.status == HttpStatus.UNAUTHORIZED.value()) {
+                        accessTokenProvider.invalidate()
+                        accessToken = obtainAccessToken() ?: run {
+                            log.error("FCM 401 후 액세스 토큰 재발급 실패: tokenSuffix={}", tokenSuffix)
+                            return SendOutcome.FAILED to accessToken
+                        }
+                    } else {
+                        sleepBackoff(attempt)
+                    }
+                }
+            }
+        }
+        return SendOutcome.FAILED to accessToken
+    }
+
+    private fun sendSingle(token: String, message: PushMessage, accessToken: String): SingleResult =
         try {
             restClient.post()
                 .uri(properties.sendUrl())
@@ -60,19 +145,37 @@ class FcmPushSenderAdapter(
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(requestBody(token, message))
                 .retrieve()
-                .onStatus({ it == HttpStatus.NOT_FOUND }) { _, response ->
-                    val body = runCatching { response.body.readAllBytes().decodeToString() }.getOrDefault("")
-                    if (isUnregistered(body)) throw InvalidTokenException()
-                    throw FcmErrorResponseException(body.take(ERROR_BODY_LOG_LENGTH))
-                }
                 .toBodilessEntity()
-            SendOutcome.SUCCESS
-        } catch (e: InvalidTokenException) {
-            SendOutcome.INVALID_TOKEN
+            SingleResult.Success
+        } catch (e: RestClientResponseException) {
+            classify(e)
+        } catch (e: ResourceAccessException) {
+            SingleResult.Retryable(status = null, reason = e.message ?: "network error", cause = e)
         } catch (e: Exception) {
-            log.warn("FCM 발송 실패: tokenSuffix={}", token.takeLast(TOKEN_LOG_SUFFIX_LENGTH), e)
-            SendOutcome.RETRYABLE_FAILURE
+            SingleResult.Permanent(status = null, reason = "${e.javaClass.simpleName}: ${e.message}")
         }
+
+    private fun classify(e: RestClientResponseException): SingleResult {
+        val status = e.statusCode.value()
+        val body = e.responseBodyAsString.take(ERROR_BODY_LOG_LENGTH)
+        return when {
+            status == HttpStatus.NOT_FOUND.value() && isUnregistered(e.responseBodyAsString) -> SingleResult.Invalid
+            status == HttpStatus.UNAUTHORIZED.value() ||
+                status == HttpStatus.TOO_MANY_REQUESTS.value() ||
+                e.statusCode.is5xxServerError -> SingleResult.Retryable(status, body, e)
+            else -> SingleResult.Permanent(status, body)
+        }
+    }
+
+    private fun sleepBackoff(attempt: Int) {
+        val delay = properties.retryBackoffMillis * (1L shl (attempt - 1))
+        if (delay <= 0) return
+        try {
+            Thread.sleep(delay)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+    }
 
     // D1: 404 + error.details[].errorCode == "UNREGISTERED" 만 무효 토큰. 파싱 실패는 무효 아님.
     private fun isUnregistered(body: String): Boolean =
@@ -91,11 +194,17 @@ class FcmPushSenderAdapter(
                 ),
         )
 
-    private enum class SendOutcome { SUCCESS, INVALID_TOKEN, RETRYABLE_FAILURE }
+    private enum class SendOutcome { SUCCESS, INVALID_TOKEN, FAILED }
 
-    private class InvalidTokenException : RuntimeException()
+    private sealed interface SingleResult {
+        data object Success : SingleResult
 
-    private class FcmErrorResponseException(body: String) : RuntimeException("FCM 404 응답: $body")
+        data object Invalid : SingleResult
+
+        data class Retryable(val status: Int?, val reason: String, val cause: Exception) : SingleResult
+
+        data class Permanent(val status: Int?, val reason: String) : SingleResult
+    }
 
     companion object {
         private const val TOKEN_LOG_SUFFIX_LENGTH = 8
