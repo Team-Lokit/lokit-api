@@ -13,6 +13,7 @@ fun Couple.toEntity(): CoupleEntity =
         disconnectedAt = disconnectedAt,
         disconnectedByUserId = disconnectedByUserId,
         firstMetDate = firstMetDate,
+        disconnectNoticeConfirmedAt = disconnectNoticeConfirmedAt,
     )
 
 fun CoupleEntity.toDomain(): Couple =
@@ -24,6 +25,7 @@ fun CoupleEntity.toDomain(): Couple =
         disconnectedAt = disconnectedAt,
         disconnectedByUserId = disconnectedByUserId,
         firstMetDate = firstMetDate,
+        disconnectNoticeConfirmedAt = disconnectNoticeConfirmedAt,
     )
 
 fun InviteCodeEntity.toDomain(): InviteCode =

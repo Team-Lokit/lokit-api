@@ -13,6 +13,7 @@ data class Couple(
     val disconnectedAt: LocalDateTime? = null,
     val disconnectedByUserId: Long? = null,
     val firstMetDate: LocalDate? = null,
+    val disconnectNoticeConfirmedAt: LocalDateTime? = null,
 ) {
     init {
         require(userIds.size <= MAX_MEMBERS)
@@ -65,6 +66,24 @@ data class Couple(
             !hasRemainingMemberForReconnect() -> CoupleReconnectRejection.NO_REMAINING_MEMBER
             else -> null
         }
+
+    /**
+     * 재연결 시 사진을 복구할 수 있는 마지막 날짜. 지금 재연결이 가능한 상태가 아니면 null.
+     * 실제 만료 시각은 disconnectedAt + RECONNECT_DAYS 이며, 이 값은 그 시각의 날짜 부분이다.
+     */
+    fun reconnectDeadline(now: LocalDateTime = LocalDateTime.now()): LocalDate? =
+        disconnectedAt
+            ?.takeIf { reconnectRejectionReason(now) == null }
+            ?.plusDays(GracePeriodPolicy.RECONNECT_DAYS)
+            ?.toLocalDate()
+
+    /** 상대가 연결을 끊었고, 남아 있는 userId 가 아직 "연결이 끊어졌어요" 알림창을 확인하지 않았는가. */
+    fun shouldShowPartnerDisconnectNoticeTo(userId: Long): Boolean =
+        status.isDisconnectedOrExpired &&
+            isMember(userId) &&
+            disconnectedByUserId != null &&
+            disconnectedByUserId != userId &&
+            disconnectNoticeConfirmedAt == null
 
     companion object {
         const val DEFAULT_COUPLE_NAME = "default"

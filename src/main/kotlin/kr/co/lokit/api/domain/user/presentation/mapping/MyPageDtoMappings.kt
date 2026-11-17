@@ -16,4 +16,5 @@ fun MyPageReadModel.toResponse(): MyPageResponse =
         defaultAlbumId = defaultAlbumId,
         backgroundImageUrl = backgroundImageUrl,
         joinedDate = joinedDate,
+        reconnectDeadline = reconnectDeadline,
     )

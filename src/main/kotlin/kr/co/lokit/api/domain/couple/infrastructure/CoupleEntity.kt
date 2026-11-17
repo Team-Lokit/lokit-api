@@ -23,6 +23,7 @@ class CoupleEntity(
     var disconnectedAt: LocalDateTime? = null,
     var disconnectedByUserId: Long? = null,
     var firstMetDate: LocalDate? = null,
+    var disconnectNoticeConfirmedAt: LocalDateTime? = null,
 ) : BaseEntity() {
     @OneToMany(
         fetch = FetchType.LAZY,
@@ -53,11 +54,19 @@ class CoupleEntity(
         status = CoupleStatus.DISCONNECTED
         disconnectedAt = LocalDateTime.now()
         disconnectedByUserId = userId
+        disconnectNoticeConfirmedAt = null
+    }
+
+    fun confirmDisconnectNotice(now: LocalDateTime = LocalDateTime.now()) {
+        if (disconnectNoticeConfirmedAt == null) {
+            disconnectNoticeConfirmedAt = now
+        }
     }
 
     fun reconnect() {
         status = CoupleStatus.CONNECTED
         disconnectedAt = null
         disconnectedByUserId = null
+        disconnectNoticeConfirmedAt = null
     }
 }

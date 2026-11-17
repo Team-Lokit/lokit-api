@@ -14,4 +14,5 @@ data class MyPageReadModel(
     val defaultAlbumId: Long,
     val backgroundImageUrl: String?,
     val joinedDate: LocalDate?,
+    val reconnectDeadline: LocalDate? = null,
 )

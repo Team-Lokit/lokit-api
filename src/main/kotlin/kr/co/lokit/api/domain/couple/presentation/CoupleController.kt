@@ -8,8 +8,10 @@ import kr.co.lokit.api.common.annotation.SyncCoupleStatusCookie
 import kr.co.lokit.api.domain.couple.application.CoupleCommandService
 import kr.co.lokit.api.domain.couple.application.port.`in`.CoupleInviteUseCase
 import kr.co.lokit.api.domain.couple.application.port.`in`.DisconnectCoupleUseCase
+import kr.co.lokit.api.domain.couple.application.port.`in`.DisconnectNoticeUseCase
 import kr.co.lokit.api.domain.couple.application.port.`in`.ReconnectCoupleUseCase
 import kr.co.lokit.api.domain.couple.dto.CoupleStatusResponse
+import kr.co.lokit.api.domain.couple.dto.DisconnectNoticeResponse
 import kr.co.lokit.api.domain.couple.dto.InviteCodePreviewResponse
 import kr.co.lokit.api.domain.couple.dto.InviteCodeResponse
 import kr.co.lokit.api.domain.couple.dto.JoinCoupleRequest
@@ -33,6 +35,7 @@ class CoupleController(
     private val reconnectCoupleUseCase: ReconnectCoupleUseCase,
     private val coupleInviteUseCase: CoupleInviteUseCase,
     private val coupleCommandService: CoupleCommandService,
+    private val disconnectNoticeUseCase: DisconnectNoticeUseCase,
 ) : CoupleApi {
     @SyncCoupleStatusCookie
     @GetMapping("me/status")
@@ -123,5 +126,18 @@ class CoupleController(
         @CurrentUserId userId: Long,
     ) {
         coupleCommandService.updateFirstMetDate(userId, request.firstMetDate)
+    }
+
+    @GetMapping("me/disconnect-notice")
+    override fun getDisconnectNotice(
+        @CurrentUserId userId: Long,
+    ): DisconnectNoticeResponse = DisconnectNoticeResponse(shouldShow = disconnectNoticeUseCase.shouldShowDisconnectNotice(userId))
+
+    @PostMapping("me/disconnect-notice/confirm")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    override fun confirmDisconnectNotice(
+        @CurrentUserId userId: Long,
+    ) {
+        disconnectNoticeUseCase.confirmDisconnectNotice(userId)
     }
 }

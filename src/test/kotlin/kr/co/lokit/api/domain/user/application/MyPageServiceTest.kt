@@ -1,5 +1,8 @@
 package kr.co.lokit.api.domain.user.application
 
+import java.time.LocalDateTime
+import org.mockito.Mockito.never
+import kr.co.lokit.api.common.constants.CoupleStatus
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.domain.album.application.port.AlbumRepositoryPort
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
@@ -162,5 +165,67 @@ class MyPageServiceTest {
         val result = myPageService.getMyPage(1L)
 
         assertEquals("myemail@test.com", result.myEmail)
+    }
+    @Test
+    fun `상대가 연결을 끊었으면 현재 커플 기준으로 재연결 마감일을 반환한다`() {
+        val disconnectedAt = LocalDateTime.now().minusDays(1)
+        val me = createUser(id = 1L)
+        val couple =
+            createCouple(
+                id = 1L,
+                userIds = listOf(1L),
+                status = CoupleStatus.DISCONNECTED,
+                disconnectedAt = disconnectedAt,
+                disconnectedByUserId = 2L,
+            )
+        `when`(userRepository.findById(1L)).thenReturn(me)
+        `when`(coupleRepository.findByUserIdFresh(1L)).thenReturn(couple)
+        `when`(photoRepository.countByCoupleId(1L)).thenReturn(0L)
+        `when`(albumRepository.findDefaultByCoupleId(1L)).thenReturn(createAlbum(id = 10L, coupleId = 1L, isDefault = true))
+
+        val result = myPageService.getMyPage(1L)
+
+        assertEquals(disconnectedAt.plusDays(31).toLocalDate(), result.reconnectDeadline)
+    }
+
+    @Test
+    fun `내가 연결을 끊었으면 내가 끊은 커플 기준으로 재연결 마감일을 반환한다`() {
+        val disconnectedAt = LocalDateTime.now().minusDays(1)
+        val me = createUser(id = 1L)
+        val newSoloCouple = createCouple(id = 5L, userIds = listOf(1L))
+        val disconnected =
+            createCouple(
+                id = 1L,
+                userIds = listOf(2L),
+                status = CoupleStatus.DISCONNECTED,
+                disconnectedAt = disconnectedAt,
+                disconnectedByUserId = 1L,
+            )
+        `when`(userRepository.findById(1L)).thenReturn(me)
+        `when`(coupleRepository.findByUserIdFresh(1L)).thenReturn(newSoloCouple)
+        `when`(coupleRepository.findByDisconnectedByUserId(1L)).thenReturn(disconnected)
+        `when`(photoRepository.countByCoupleId(5L)).thenReturn(0L)
+        `when`(albumRepository.findDefaultByCoupleId(5L)).thenReturn(createAlbum(id = 50L, coupleId = 5L, isDefault = true))
+
+        val result = myPageService.getMyPage(1L)
+
+        assertEquals(disconnectedAt.plusDays(31).toLocalDate(), result.reconnectDeadline)
+    }
+
+    @Test
+    fun `연결된 상태면 재연결 마감일은 null이다`() {
+        val me = createUser(id = 1L)
+        val partner = createUser(id = 2L)
+        val couple = createCouple(id = 1L, userIds = listOf(1L, 2L))
+        `when`(userRepository.findById(1L)).thenReturn(me)
+        `when`(userRepository.findById(2L)).thenReturn(partner)
+        `when`(coupleRepository.findByUserIdFresh(1L)).thenReturn(couple)
+        `when`(photoRepository.countByCoupleId(1L)).thenReturn(0L)
+        `when`(albumRepository.findDefaultByCoupleId(1L)).thenReturn(createAlbum(id = 10L, coupleId = 1L, isDefault = true))
+
+        val result = myPageService.getMyPage(1L)
+
+        assertNull(result.reconnectDeadline)
+        verify(coupleRepository, never()).findByDisconnectedByUserId(1L)
     }
 }
