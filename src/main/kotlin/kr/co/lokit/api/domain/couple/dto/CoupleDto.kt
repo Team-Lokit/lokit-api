@@ -74,3 +74,9 @@ data class InviteCodePreviewResponse(
     val nickname: String,
     val profileImageUrl: String?,
 )
+
+@Schema(description = "연결 끊김 알림창 노출 여부 응답")
+data class DisconnectNoticeResponse(
+    @Schema(description = "상대가 연결을 끊었고 아직 알림창을 확인하지 않았으면 true", example = "true")
+    val shouldShow: Boolean,
+)

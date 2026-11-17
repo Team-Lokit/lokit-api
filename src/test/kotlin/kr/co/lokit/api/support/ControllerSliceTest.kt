@@ -16,6 +16,7 @@ import kr.co.lokit.api.domain.couple.application.CoupleCookieStatusResolver
 import kr.co.lokit.api.domain.couple.application.port.`in`.CoupleInviteUseCase
 import kr.co.lokit.api.domain.couple.application.port.`in`.CreateCoupleUseCase
 import kr.co.lokit.api.domain.couple.application.port.`in`.DisconnectCoupleUseCase
+import kr.co.lokit.api.domain.couple.application.port.`in`.DisconnectNoticeUseCase
 import kr.co.lokit.api.domain.couple.application.port.`in`.ReconnectCoupleUseCase
 import kr.co.lokit.api.domain.couple.presentation.CoupleController
 import kr.co.lokit.api.domain.map.application.port.`in`.GetMapUseCase
@@ -111,6 +112,7 @@ abstract class ControllerSliceTest {
     @MockitoBean lateinit var coupleCookieStatusResolver: CoupleCookieStatusResolver
     @MockitoBean lateinit var createCoupleUseCase: CreateCoupleUseCase
     @MockitoBean lateinit var disconnectCoupleUseCase: DisconnectCoupleUseCase
+    @MockitoBean lateinit var disconnectNoticeUseCase: DisconnectNoticeUseCase
     @MockitoBean lateinit var reconnectCoupleUseCase: ReconnectCoupleUseCase
     @MockitoBean lateinit var coupleInviteUseCase: CoupleInviteUseCase
     @MockitoBean lateinit var coupleCommandService: CoupleCommandService

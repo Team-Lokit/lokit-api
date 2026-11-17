@@ -48,4 +48,9 @@ data class MyPageResponse(
     val backgroundImageUrl: String?,
     @Schema(description = "회원가입 날짜", example = "2026-04-01")
     val joinedDate: LocalDate?,
+    @Schema(
+        description = "재연결 마감일. 이 날짜까지 재연결하면 사진을 복구할 수 있다. 연결이 끊긴 상태(내가 끊음·상대가 끊음)가 아니거나 재연결 기간이 지났으면 null",
+        example = "2026-02-11",
+    )
+    val reconnectDeadline: LocalDate?,
 )
