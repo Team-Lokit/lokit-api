@@ -16,11 +16,12 @@ class JpaRefreshTokenRepository(
     private val userJpaRepository: UserJpaRepository,
     private val refreshTokenHasher: RefreshTokenHasher,
 ) : RefreshTokenRepositoryPort {
-    override fun findByToken(token: String): RefreshTokenRecord? =
-        refreshTokenJpaRepository.findByTokenHash(refreshTokenHasher.hash(token))?.let {
+    override fun findByTokenForUpdate(token: String): RefreshTokenRecord? =
+        refreshTokenJpaRepository.findByTokenHashForUpdate(refreshTokenHasher.hash(token))?.let {
             RefreshTokenRecord(
                 userId = it.user.nonNullId(),
                 expiresAt = it.expiresAt,
+                rotatedAt = it.rotatedAt,
             )
         }
 
@@ -44,24 +45,14 @@ class JpaRefreshTokenRepository(
         )
     }
 
-    override fun rotate(
-        oldToken: String,
-        newToken: String,
-        expiresAt: LocalDateTime,
+    override fun markRotated(
+        token: String,
+        rotatedAt: LocalDateTime,
     ) {
-        val oldTokenHash = refreshTokenHasher.hash(oldToken)
-        val oldRefreshTokenEntity =
-            refreshTokenJpaRepository.findByTokenHash(oldTokenHash)
-                ?: return
-
-        refreshTokenJpaRepository.deleteByTokenHash(oldTokenHash)
-        refreshTokenJpaRepository.save(
-            RefreshTokenEntity(
-                tokenHash = refreshTokenHasher.hash(newToken),
-                user = oldRefreshTokenEntity.user,
-                expiresAt = expiresAt,
-            ),
-        )
+        val entity =
+            refreshTokenJpaRepository.findByTokenHash(refreshTokenHasher.hash(token))
+                ?: throw IllegalStateException("rotating refresh token not found")
+        entity.markRotated(rotatedAt)
     }
 
     override fun deleteByUserId(userId: Long) {
