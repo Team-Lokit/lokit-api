@@ -1,5 +1,8 @@
 package kr.co.lokit.api.domain.couple.presentation
 
+import org.mockito.Mockito.verify
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import kr.co.lokit.api.common.constants.CoupleCookieStatus
@@ -173,5 +176,26 @@ class CoupleControllerTest : ControllerSliceTest() {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(createCoupleRequest())),
             ).andExpect(status().isUnauthorized)
+    }
+    @Test
+    fun `연결 끊김 알림창 노출 여부 조회`() {
+        doReturn(true).`when`(disconnectNoticeUseCase).shouldShowDisconnectNotice(anyLong())
+
+        mockMvc
+            .perform(get("/couples/me/disconnect-notice").with(authentication(userAuth())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.shouldShow").value(true))
+    }
+
+    @Test
+    fun `연결 끊김 알림창 확인 처리`() {
+        mockMvc
+            .perform(
+                post("/couples/me/disconnect-notice/confirm")
+                    .with(authentication(userAuth()))
+                    .with(csrf()),
+            ).andExpect(status().isNoContent)
+
+        verify(disconnectNoticeUseCase).confirmDisconnectNotice(anyLong())
     }
 }

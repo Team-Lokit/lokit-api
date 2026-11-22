@@ -1,5 +1,8 @@
 package kr.co.lokit.api.domain.user.presentation
 
+import jakarta.servlet.http.Cookie
+import kr.co.lokit.api.common.constants.DomainCookie
+import kr.co.lokit.api.config.security.AuthenticationFilter
 import kr.co.lokit.api.config.web.CookieGenerator
 import kr.co.lokit.api.domain.user.application.LoginService
 import kr.co.lokit.api.domain.user.application.port.OAuthProvider
@@ -44,7 +47,7 @@ class AuthControllerTest : ControllerSliceTest() {
                     .content("""{"deviceToken":"fcm-1"}"""),
             ).andExpect(status().isNoContent)
 
-        verify(authService).logout(1L, "fcm-1")
+        verify(authService).logout(1L, null, "fcm-1")
     }
 
     @Test
@@ -56,7 +59,38 @@ class AuthControllerTest : ControllerSliceTest() {
                     .with(csrf()),
             ).andExpect(status().isNoContent)
 
-        verify(authService).logout(1L, null)
+        verify(authService).logout(1L, null, null)
+    }
+
+    @Test
+    fun `로그아웃하면 쿠키의 리프레시 토큰을 서비스에 넘긴다`() {
+        whenever(cookieGenerator.resolveCookieName(DomainCookie.REFRESH_TOKEN)).thenReturn(DomainCookie.REFRESH_TOKEN.value)
+
+        mockMvc
+            .perform(
+                post("/auth/logout")
+                    .with(authentication(userAuth()))
+                    .with(csrf())
+                    .cookie(Cookie(DomainCookie.REFRESH_TOKEN.value, "refresh-this-device")),
+            ).andExpect(status().isNoContent)
+
+        verify(authService).logout(1L, "refresh-this-device", null)
+    }
+
+    @Test
+    fun `같은 요청에서 필터가 리프레시 토큰을 교체했다면 교체된 토큰을 서비스에 넘긴다`() {
+        whenever(cookieGenerator.resolveCookieName(DomainCookie.REFRESH_TOKEN)).thenReturn(DomainCookie.REFRESH_TOKEN.value)
+
+        mockMvc
+            .perform(
+                post("/auth/logout")
+                    .with(authentication(userAuth()))
+                    .with(csrf())
+                    .cookie(Cookie(DomainCookie.REFRESH_TOKEN.value, "old-refresh"))
+                    .requestAttr(AuthenticationFilter.ROTATED_REFRESH_TOKEN_ATTRIBUTE, "rotated-refresh"),
+            ).andExpect(status().isNoContent)
+
+        verify(authService).logout(1L, "rotated-refresh", null)
     }
 
     private fun stubAppleLogin(): LoginService {

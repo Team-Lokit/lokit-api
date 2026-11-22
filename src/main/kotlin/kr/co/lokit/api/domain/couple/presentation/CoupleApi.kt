@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import kr.co.lokit.api.domain.couple.dto.CoupleStatusResponse
+import kr.co.lokit.api.domain.couple.dto.DisconnectNoticeResponse
 import kr.co.lokit.api.domain.couple.dto.InviteCodePreviewResponse
 import kr.co.lokit.api.domain.couple.dto.InviteCodeResponse
 import kr.co.lokit.api.domain.couple.dto.JoinCoupleRequest
@@ -119,6 +120,25 @@ interface CoupleApi {
     )
     fun updateFirstMetDate(
         request: UpdateFirstMetDateRequest,
+        @Parameter(hidden = true) userId: Long,
+    )
+
+    @Operation(
+        summary = "연결 끊김 알림창 노출 여부 조회",
+        description = "상대방이 연결을 끊은 뒤 아직 '상대방과 연결이 끊어졌어요' 알림창을 확인하지 않았으면 shouldShow=true 를 반환합니다. " +
+            "확인 여부는 서버에 저장되므로 기기가 바뀌어도 한 번만 노출됩니다. 내가 끊은 경우·연결 중인 경우는 항상 false 입니다.",
+        responses = [ApiResponse(responseCode = "200", description = "조회 성공")],
+    )
+    fun getDisconnectNotice(
+        @Parameter(hidden = true) userId: Long,
+    ): DisconnectNoticeResponse
+
+    @Operation(
+        summary = "연결 끊김 알림창 확인 처리",
+        description = "사용자가 연결 끊김 알림창을 닫았을 때 호출합니다. 이후 조회 시 shouldShow=false 가 됩니다. 보여줄 알림창이 없을 때 호출해도 204 입니다.",
+        responses = [ApiResponse(responseCode = "204", description = "확인 처리 성공")],
+    )
+    fun confirmDisconnectNotice(
         @Parameter(hidden = true) userId: Long,
     )
 }

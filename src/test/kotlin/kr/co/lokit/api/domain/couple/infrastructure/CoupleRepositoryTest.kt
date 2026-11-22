@@ -1,5 +1,6 @@
 package kr.co.lokit.api.domain.couple.infrastructure
 
+import kotlin.test.assertNull
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kr.co.lokit.api.common.constants.CoupleStatus
@@ -106,5 +107,16 @@ class CoupleRepositoryTest : JpaSliceTest() {
         assertEquals(latestDisconnected.id, found.id)
         assertEquals(CoupleStatus.DISCONNECTED, found.status)
         assertEquals(user.nonNullId(), found.disconnectedByUserId)
+    }
+    @Test
+    fun `연결 끊김 알림창 확인 시각은 저장되고 다시 끊으면 초기화된다`() {
+        val saved = coupleRepository.saveWithUser(createCouple(name = "c"), user.nonNullId())
+        coupleRepository.disconnect(saved.id, 999L)
+
+        coupleRepository.confirmDisconnectNotice(saved.id)
+        assertNotNull(coupleRepository.findById(saved.id)?.disconnectNoticeConfirmedAt)
+
+        coupleRepository.disconnect(saved.id, 999L)
+        assertNull(coupleRepository.findById(saved.id)?.disconnectNoticeConfirmedAt)
     }
 }

@@ -61,7 +61,19 @@ class AuthenticationFilter(
             if (refreshToken != null) {
                 val tokens = authService.refreshIfValid(refreshToken)
                 if (tokens != null) {
-                    setTokenCookies(request, response, tokens.accessToken, tokens.refreshToken)
+                    response.addHeader(
+                        HttpHeaders.SET_COOKIE,
+                        cookieGenerator.createAccessTokenCookie(request, tokens.accessToken).toString(),
+                    )
+                    // refreshToken 이 null 이면 다른 요청이 먼저 교체한 경우다. 그 요청이 내려준 리프레시 쿠키를 덮어쓰지 않는다.
+                    tokens.refreshToken?.let { rotated ->
+                        response.addHeader(
+                            HttpHeaders.SET_COOKIE,
+                            cookieGenerator.createRefreshTokenCookie(request, rotated).toString(),
+                        )
+                        // 이 요청 안에서 쿠키의 리프레시 토큰은 이미 교체됐다. 로그아웃 등은 새 토큰을 기준으로 처리해야 한다.
+                        request.setAttribute(ROTATED_REFRESH_TOKEN_ATTRIBUTE, rotated)
+                    }
 
                     val authentication = compositeAuthenticationResolver.authenticate(tokens.accessToken)
                     if (authentication != null) {
@@ -84,6 +96,10 @@ class AuthenticationFilter(
         filterChain.doFilter(request, response)
     }
 
+    companion object {
+        const val ROTATED_REFRESH_TOKEN_ATTRIBUTE = "lokit.rotatedRefreshToken"
+    }
+
     private fun getTokenFromCookie(
         request: HttpServletRequest,
         name: DomainCookie,
@@ -92,20 +108,4 @@ class AuthenticationFilter(
             ?.find { it.name == cookieGenerator.resolveCookieName(name) }
             ?.value
             ?.takeIf { it.isNotBlank() && !it.contains(" ") }
-
-    private fun setTokenCookies(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-        accessToken: String,
-        refreshToken: String,
-    ) {
-        response.addHeader(
-            HttpHeaders.SET_COOKIE,
-            cookieGenerator.createAccessTokenCookie(request, accessToken).toString(),
-        )
-        response.addHeader(
-            HttpHeaders.SET_COOKIE,
-            cookieGenerator.createRefreshTokenCookie(request, refreshToken).toString(),
-        )
-    }
 }

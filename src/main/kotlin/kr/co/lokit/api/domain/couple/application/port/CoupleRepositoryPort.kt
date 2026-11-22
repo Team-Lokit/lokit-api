@@ -39,4 +39,6 @@ interface CoupleRepositoryPort {
     ): Couple
 
     fun updateFirstMetDate(coupleId: Long, firstMetDate: LocalDate)
+
+    fun confirmDisconnectNotice(coupleId: Long)
 }

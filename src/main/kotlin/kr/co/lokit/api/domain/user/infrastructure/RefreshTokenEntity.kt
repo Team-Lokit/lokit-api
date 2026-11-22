@@ -21,4 +21,11 @@ class RefreshTokenEntity(
     val user: UserEntity,
     @Column(nullable = false)
     val expiresAt: LocalDateTime,
-) : BaseEntity()
+    var rotatedAt: LocalDateTime? = null,
+) : BaseEntity() {
+    fun markRotated(at: LocalDateTime) {
+        if (rotatedAt == null) {
+            rotatedAt = at
+        }
+    }
+}

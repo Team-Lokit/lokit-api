@@ -164,6 +164,14 @@ class JpaCoupleRepository(
         entity.firstMetDate = firstMetDate
     }
 
+    @Transactional
+    override fun confirmDisconnectNotice(coupleId: Long) {
+        val entity =
+            coupleJpaRepository.findByIdOrNull(coupleId)
+                ?: throw entityNotFound<Couple>(coupleId)
+        entity.confirmDisconnectNotice()
+    }
+
     private fun coupleSelectionComparator(): Comparator<CoupleEntity> =
         compareBy<CoupleEntity> { it.status.selectionPriority }
             .thenByDescending { it.coupleUsers.size }

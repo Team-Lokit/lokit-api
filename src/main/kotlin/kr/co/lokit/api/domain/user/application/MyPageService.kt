@@ -4,6 +4,7 @@ import kr.co.lokit.api.common.exception.entityNotFound
 import kr.co.lokit.api.domain.album.application.port.AlbumRepositoryPort
 import kr.co.lokit.api.domain.album.domain.Album
 import kr.co.lokit.api.domain.couple.application.port.CoupleRepositoryPort
+import kr.co.lokit.api.domain.couple.domain.Couple
 import kr.co.lokit.api.domain.photo.application.port.PhotoRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.UserRepositoryPort
 import kr.co.lokit.api.domain.user.application.port.`in`.GetMyPageUseCase
@@ -76,7 +77,23 @@ class MyPageService(
             defaultAlbumId = defaultAlbumId,
             backgroundImageUrl = backgroundImageUrl,
             joinedDate = me.joinedAt?.toLocalDate(),
+            reconnectDeadline = if (isCoupled) null else resolveReconnectDeadline(userId, couple),
         )
+    }
+
+    /**
+     * 상대가 끊은 경우: 사용자는 기존 커플에 남아 있으므로 현재 커플이 곧 끊긴 커플이다.
+     * 내가 끊은 경우: 사용자는 새 기본 커플로 옮겨졌으므로 disconnectedByUserId 로 찾는다.
+     * (CoupleCookieStatusResolver 와 같은 탐색 순서)
+     */
+    private fun resolveReconnectDeadline(
+        userId: Long,
+        currentCouple: Couple?,
+    ): LocalDate? {
+        val disconnectedCouple =
+            currentCouple?.takeIf { it.status.isDisconnectedOrExpired }
+                ?: coupleRepository.findByDisconnectedByUserId(userId)
+        return disconnectedCouple?.reconnectDeadline()
     }
 
     @Transactional

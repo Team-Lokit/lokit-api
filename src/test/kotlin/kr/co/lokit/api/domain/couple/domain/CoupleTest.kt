@@ -1,8 +1,12 @@
 package kr.co.lokit.api.domain.couple.domain
 
+import kr.co.lokit.api.common.constants.CoupleStatus
 import org.junit.jupiter.api.Test
+import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CoupleTest {
@@ -61,5 +65,56 @@ class CoupleTest {
         val couple = Couple(id = 1L, name = "우리 커플", userIds = listOf(1L, 2L))
 
         assertFalse(couple.arePartners(1L, 1L))
+    }
+    @Test
+    fun `재연결 가능 상태면 재연결 마감일은 끊긴 날짜 + 31일이다`() {
+        val now = LocalDateTime.of(2026, 1, 20, 12, 0)
+        val couple =
+            Couple(
+                name = "c",
+                userIds = listOf(2L),
+                status = CoupleStatus.DISCONNECTED,
+                disconnectedAt = LocalDateTime.of(2026, 1, 11, 9, 0),
+                disconnectedByUserId = 1L,
+            )
+
+        assertEquals(LocalDate.of(2026, 2, 11), couple.reconnectDeadline(now))
+    }
+
+    @Test
+    fun `연결 중이거나 재연결 기간이 지났거나 남은 멤버가 없으면 재연결 마감일은 null이다`() {
+        val disconnectedAt = LocalDateTime.of(2026, 1, 11, 9, 0)
+        val base =
+            Couple(
+                name = "c",
+                userIds = listOf(2L),
+                status = CoupleStatus.DISCONNECTED,
+                disconnectedAt = disconnectedAt,
+                disconnectedByUserId = 1L,
+            )
+
+        assertNull(Couple(name = "c", userIds = listOf(1L, 2L)).reconnectDeadline())
+        assertNull(base.reconnectDeadline(disconnectedAt.plusDays(32)))
+        assertNull(base.copy(status = CoupleStatus.EXPIRED).reconnectDeadline(disconnectedAt.plusDays(1)))
+        assertNull(base.copy(userIds = emptyList()).reconnectDeadline(disconnectedAt.plusDays(1)))
+    }
+
+    @Test
+    fun `연결 끊김 알림창은 상대가 끊은 경우 남은 멤버에게 확인 전까지만 보인다`() {
+        val couple =
+            Couple(
+                name = "c",
+                userIds = listOf(2L),
+                status = CoupleStatus.DISCONNECTED,
+                disconnectedAt = LocalDateTime.now(),
+                disconnectedByUserId = 1L,
+            )
+
+        assertTrue(couple.shouldShowPartnerDisconnectNoticeTo(2L))
+        assertTrue(couple.copy(status = CoupleStatus.EXPIRED).shouldShowPartnerDisconnectNoticeTo(2L))
+        assertFalse(couple.shouldShowPartnerDisconnectNoticeTo(1L))
+        assertFalse(couple.shouldShowPartnerDisconnectNoticeTo(3L))
+        assertFalse(couple.copy(disconnectNoticeConfirmedAt = LocalDateTime.now()).shouldShowPartnerDisconnectNoticeTo(2L))
+        assertFalse(Couple(name = "c", userIds = listOf(1L, 2L)).shouldShowPartnerDisconnectNoticeTo(2L))
     }
 }
