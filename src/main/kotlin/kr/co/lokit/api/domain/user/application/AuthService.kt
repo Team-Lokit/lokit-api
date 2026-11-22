@@ -20,9 +20,19 @@ class AuthService(
     private val jwtTokenProvider: JwtTokenProvider,
     private val deleteDeviceTokensUseCase: DeleteDeviceTokensUseCase,
 ) {
+    /**
+     * 이 기기의 리프레시 토큰만 폐기한다. 여러 기기 로그인을 허용하므로 다른 기기의 세션은 유지된다.
+     * (전체 폐기는 탈퇴 시 UserWithdrawService 가 담당)
+     */
     @Transactional
-    fun logout(userId: Long, deviceToken: String? = null) {
-        refreshTokenRepository.deleteByUserId(userId)
+    fun logout(
+        userId: Long,
+        refreshToken: String?,
+        deviceToken: String? = null,
+    ) {
+        if (!refreshToken.isNullOrBlank()) {
+            refreshTokenRepository.deleteByToken(refreshToken)
+        }
         if (deviceToken.isNullOrBlank()) {
             deleteDeviceTokensUseCase.deleteAllByUserId(userId)
         } else {

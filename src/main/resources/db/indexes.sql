@@ -14,7 +14,6 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_album_couple_id_active ON album (cou
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_album_photo_added_at ON album USING BRIN(photo_added_at);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_couple_user_covering_active ON couple_user (user_id) INCLUDE (couple_id) WHERE is_deleted = false;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_refresh_token_expires_at ON refresh_token (expires_at);
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_refresh_token_user_active ON refresh_token (user_id) WHERE is_deleted = false;
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_refresh_token_token_hash_active ON refresh_token (token_hash) WHERE is_deleted = false;
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS unique_user_email_is_deleted ON users (email, is_deleted);
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_couple_user_one_active_per_user ON couple_user (user_id) WHERE is_deleted = false;

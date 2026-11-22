@@ -108,31 +108,40 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `로그아웃 시 리프레시 토큰이 삭제된다`() {
-        authService.logout(1L)
+    fun `로그아웃하면 이 기기의 리프레시 토큰만 삭제하고 다른 기기의 토큰은 남긴다`() {
+        authService.logout(1L, "refresh-this-device")
 
-        verify(refreshTokenRepository).deleteByUserId(1L)
+        verify(refreshTokenRepository).deleteByToken("refresh-this-device")
+        verify(refreshTokenRepository, never()).deleteByUserId(org.mockito.kotlin.any<Long>())
+    }
+
+    @Test
+    fun `리프레시 토큰 없이 로그아웃하면 서버의 리프레시 토큰은 건드리지 않는다`() {
+        authService.logout(1L, null)
+
+        verify(refreshTokenRepository, never()).deleteByToken(org.mockito.kotlin.any<String>())
+        verify(refreshTokenRepository, never()).deleteByUserId(org.mockito.kotlin.any<Long>())
     }
 
     @Test
     fun `deviceToken 없이 로그아웃하면 디바이스 토큰이 전부 삭제된다`() {
-        authService.logout(1L)
+        authService.logout(1L, "refresh")
 
         verify(deleteDeviceTokensUseCase).deleteAllByUserId(1L)
     }
 
     @Test
     fun `deviceToken 을 주고 로그아웃하면 그 기기 토큰만 삭제하고 리프레시 토큰도 삭제한다`() {
-        authService.logout(1L, "fcm-1")
+        authService.logout(1L, "refresh", "fcm-1")
 
         verify(deleteDeviceTokensUseCase).deleteByUserIdAndToken(1L, "fcm-1")
         verify(deleteDeviceTokensUseCase, never()).deleteAllByUserId(org.mockito.kotlin.any<Long>())
-        verify(refreshTokenRepository).deleteByUserId(1L)
+        verify(refreshTokenRepository).deleteByToken("refresh")
     }
 
     @Test
     fun `deviceToken 이 공백이면 디바이스 토큰이 전부 삭제된다`() {
-        authService.logout(1L, " ")
+        authService.logout(1L, "refresh", " ")
 
         verify(deleteDeviceTokensUseCase).deleteAllByUserId(1L)
         verify(deleteDeviceTokensUseCase, never()).deleteByUserIdAndToken(org.mockito.kotlin.any<Long>(), org.mockito.kotlin.any<String>())
