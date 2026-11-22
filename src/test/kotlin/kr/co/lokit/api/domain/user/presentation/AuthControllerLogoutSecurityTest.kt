@@ -100,7 +100,7 @@ class AuthControllerLogoutSecurityTest {
             .andExpect(cookie().maxAge("refreshToken", 0))
             .andExpect(cookie().maxAge("coupleStatus", 0))
 
-        verify(authService, never()).logout(any(), anyOrNull())
+        verify(authService, never()).logout(any(), anyOrNull(), anyOrNull())
     }
 
     @Test
@@ -112,19 +112,23 @@ class AuthControllerLogoutSecurityTest {
             .andExpect(cookie().maxAge("refreshToken", 0))
             .andExpect(cookie().maxAge("coupleStatus", 0))
 
-        verify(authService, never()).logout(any(), anyOrNull())
+        verify(authService, never()).logout(any(), anyOrNull(), anyOrNull())
     }
 
     @Test
     fun `유효한 인증으로 로그아웃하면 서비스를 호출하고 쿠키를 삭제한다`() {
         mockMvc
-            .perform(post("/auth/logout").with(authentication(userAuth())))
+            .perform(
+                post("/auth/logout")
+                    .with(authentication(userAuth()))
+                    .cookie(Cookie(DomainCookie.REFRESH_TOKEN.value, "refresh-this-device")),
+            )
             .andExpect(status().isNoContent)
             .andExpect(cookie().maxAge("accessToken", 0))
             .andExpect(cookie().maxAge("refreshToken", 0))
             .andExpect(cookie().maxAge("coupleStatus", 0))
 
-        verify(authService).logout(1L, null)
+        verify(authService).logout(1L, "refresh-this-device", null)
     }
 
 }

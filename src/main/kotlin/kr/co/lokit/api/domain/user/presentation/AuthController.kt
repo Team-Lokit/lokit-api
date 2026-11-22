@@ -4,8 +4,10 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
 import kr.co.lokit.api.common.annotation.CurrentUserId
+import kr.co.lokit.api.common.constants.DomainCookie
 import kr.co.lokit.api.common.exception.BusinessException
 import kr.co.lokit.api.common.exception.ErrorCode
+import kr.co.lokit.api.config.security.AuthenticationFilter
 import kr.co.lokit.api.config.web.CookieGenerator
 import kr.co.lokit.api.domain.couple.application.CoupleCookieStatusResolver
 import kr.co.lokit.api.domain.user.application.AuthService
@@ -202,7 +204,7 @@ class AuthController(
     ) {
         // 토큰이 없거나 유효하지 않으면 서버 상태는 건드리지 않고 쿠키만 삭제한다.
         if (userId != null) {
-            authService.logout(userId, request?.deviceToken)
+            authService.logout(userId, resolveCurrentRefreshToken(req), request?.deviceToken)
         }
         res.setHeader(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate, max-age=0")
         res.setHeader("Pragma", "no-cache")
@@ -211,6 +213,14 @@ class AuthController(
         res.addHeader(HttpHeaders.SET_COOKIE, cookieGenerator.clearRefreshTokenCookie(req).toString())
         res.addHeader(HttpHeaders.SET_COOKIE, cookieGenerator.clearCoupleStatusCookie(req).toString())
     }
+
+    /** 같은 요청에서 필터가 토큰을 교체했다면 교체된 토큰, 아니면 쿠키의 토큰. */
+    private fun resolveCurrentRefreshToken(req: HttpServletRequest): String? =
+        req.getAttribute(AuthenticationFilter.ROTATED_REFRESH_TOKEN_ATTRIBUTE) as? String
+            ?: req.cookies
+                ?.firstOrNull { it.name == cookieGenerator.resolveCookieName(DomainCookie.REFRESH_TOKEN) }
+                ?.value
+                ?.takeIf { it.isNotBlank() }
 
     private fun resolveRedirectFromReferer(req: HttpServletRequest): String? {
         val referer = req.getHeader("Referer") ?: return null

@@ -62,6 +62,8 @@ class AuthenticationFilter(
                 val tokens = authService.refreshIfValid(refreshToken)
                 if (tokens != null) {
                     setTokenCookies(request, response, tokens.accessToken, tokens.refreshToken)
+                    // 이 요청 안에서 쿠키의 리프레시 토큰은 이미 교체됐다. 로그아웃 등은 새 토큰을 기준으로 처리해야 한다.
+                    request.setAttribute(ROTATED_REFRESH_TOKEN_ATTRIBUTE, tokens.refreshToken)
 
                     val authentication = compositeAuthenticationResolver.authenticate(tokens.accessToken)
                     if (authentication != null) {
@@ -82,6 +84,10 @@ class AuthenticationFilter(
         }
 
         filterChain.doFilter(request, response)
+    }
+
+    companion object {
+        const val ROTATED_REFRESH_TOKEN_ATTRIBUTE = "lokit.rotatedRefreshToken"
     }
 
     private fun getTokenFromCookie(
