@@ -86,7 +86,7 @@ class AuthControllerLogoutSecurityTest {
     @Test
     fun `유효하지 않은 토큰으로 로그아웃하면 서비스 호출 없이 쿠키를 삭제하고 204를 반환한다`() {
         whenever(compositeAuthenticationResolver.authenticate(any())).thenReturn(null)
-        whenever(authService.refreshIfValid(any())).thenReturn(null)
+        whenever(authService.refreshIfValid(any(), any())).thenReturn(null)
 
         mockMvc
             .perform(

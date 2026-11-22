@@ -48,7 +48,7 @@ class AuthServiceTest {
                 expiresAt = LocalDateTime.now().plusDays(7),
             )
 
-        `when`(refreshTokenRepository.findByToken("valid-token")).thenReturn(refreshTokenRecord)
+        `when`(refreshTokenRepository.findByTokenForUpdate("valid-token")).thenReturn(refreshTokenRecord)
         `when`(userRepository.findById(1L)).thenReturn(testUser)
         `when`(jwtTokenProvider.generateAccessToken(testUser)).thenReturn("new-access-token")
         `when`(jwtTokenProvider.generateRefreshToken()).thenReturn("new-refresh-token")
@@ -63,7 +63,7 @@ class AuthServiceTest {
 
     @Test
     fun `존재하지 않는 리프레시 토큰이면 null을 반환한다`() {
-        `when`(refreshTokenRepository.findByToken("unknown-token")).thenReturn(null)
+        `when`(refreshTokenRepository.findByTokenForUpdate("unknown-token")).thenReturn(null)
 
         val result = authService.refreshIfValid("unknown-token")
 
@@ -77,7 +77,7 @@ class AuthServiceTest {
                 userId = 1L,
                 expiresAt = LocalDateTime.now().minusDays(1),
             )
-        `when`(refreshTokenRepository.findByToken("expired-token")).thenReturn(expiredRecord)
+        `when`(refreshTokenRepository.findByTokenForUpdate("expired-token")).thenReturn(expiredRecord)
 
         val result = authService.refreshIfValid("expired-token")
 
@@ -92,7 +92,7 @@ class AuthServiceTest {
                 userId = 1L,
                 expiresAt = LocalDateTime.now().plusDays(7),
             )
-        `when`(refreshTokenRepository.findByToken("valid-token")).thenReturn(refreshTokenRecord)
+        `when`(refreshTokenRepository.findByTokenForUpdate("valid-token")).thenReturn(refreshTokenRecord)
         `when`(userRepository.findById(1L)).thenReturn(testUser)
         `when`(jwtTokenProvider.generateAccessToken(testUser)).thenReturn("new-access-token")
         `when`(jwtTokenProvider.generateRefreshToken()).thenReturn("new-refresh-token")
@@ -100,11 +100,48 @@ class AuthServiceTest {
 
         authService.refreshIfValid("valid-token")
 
-        verify(refreshTokenRepository).rotate(
-            org.mockito.kotlin.eq("valid-token"),
+        verify(refreshTokenRepository).markRotated(org.mockito.kotlin.eq("valid-token"), org.mockito.kotlin.any())
+        verify(refreshTokenRepository).save(
+            org.mockito.kotlin.eq(1L),
             org.mockito.kotlin.eq("new-refresh-token"),
             org.mockito.kotlin.any(),
         )
+    }
+
+    @Test
+    fun `유예 시간 안에 이미 교체된 토큰이 오면 액세스 토큰만 발급하고 리프레시 토큰은 건드리지 않는다`() {
+        val now = LocalDateTime.of(2026, 11, 22, 9, 0, 0)
+        val rotatedRecord =
+            RefreshTokenRecord(userId = 1L, expiresAt = now.plusDays(30), rotatedAt = now.minusSeconds(5))
+        `when`(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(rotatedRecord)
+        `when`(userRepository.findById(1L)).thenReturn(testUser)
+        `when`(jwtTokenProvider.generateAccessToken(testUser)).thenReturn("new-access-token")
+
+        val result = authService.refreshIfValid("old-token", now)
+
+        assertNotNull(result)
+        assertEquals("new-access-token", result.accessToken)
+        assertNull(result.refreshToken)
+        verify(refreshTokenRepository, never()).markRotated(org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        verify(refreshTokenRepository, never()).save(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        verify(refreshTokenRepository, never()).deleteByToken(org.mockito.kotlin.any())
+    }
+
+    @Test
+    fun `유예 시간이 지난 교체된 토큰이 오면 삭제하고 null을 반환한다`() {
+        val now = LocalDateTime.of(2026, 11, 22, 9, 0, 0)
+        val rotatedRecord =
+            RefreshTokenRecord(
+                userId = 1L,
+                expiresAt = now.plusDays(30),
+                rotatedAt = now.minusSeconds(AuthService.ROTATION_GRACE_SECONDS + 1),
+            )
+        `when`(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(rotatedRecord)
+
+        val result = authService.refreshIfValid("old-token", now)
+
+        assertNull(result)
+        verify(refreshTokenRepository).deleteByToken("old-token")
     }
 
     @Test
@@ -154,7 +191,7 @@ class AuthServiceTest {
                 userId = 1L,
                 expiresAt = LocalDateTime.now().plusDays(7),
             )
-        `when`(refreshTokenRepository.findByToken("valid-token")).thenReturn(refreshTokenRecord)
+        `when`(refreshTokenRepository.findByTokenForUpdate("valid-token")).thenReturn(refreshTokenRecord)
         `when`(userRepository.findById(1L)).thenReturn(null)
 
         assertThrows<BusinessException.UserNotFoundException> {
