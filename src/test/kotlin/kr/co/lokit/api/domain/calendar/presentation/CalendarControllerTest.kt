@@ -11,6 +11,7 @@ import kr.co.lokit.api.domain.calendar.domain.CalendarPhoto
 import kr.co.lokit.api.fixture.userAuth
 import kr.co.lokit.api.support.ControllerSliceTest
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -97,5 +98,33 @@ class CalendarControllerTest : ControllerSliceTest() {
         mockMvc
             .perform(get("/calendar/days/2026-02-30/photos").with(authentication(userAuth())))
             .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `albumId 로 월간 캘린더를 조회한다`() {
+        val month = YearMonth.of(2026, 11)
+        whenever(getCalendarUseCase.getMonth(1L, month, 5L)).thenReturn(CalendarMonth(month, emptyList()))
+
+        mockMvc
+            .perform(get("/calendar").param("yearMonth", "2026-11").param("albumId", "5").with(authentication(userAuth())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.days").isEmpty)
+
+        verify(getCalendarUseCase).getMonth(1L, month, 5L)
+    }
+
+    @Test
+    fun `albumId 로 날짜별 사진 목록을 조회한다`() {
+        val date = LocalDate.of(2026, 11, 2)
+        whenever(getCalendarUseCase.getDayPhotos(1L, date, 5L)).thenReturn(
+            listOf(CalendarPhoto(812L, "https://example.com/812.jpg", LocalDateTime.of(2026, 11, 2, 21, 10), "테헤란로")),
+        )
+
+        mockMvc
+            .perform(get("/calendar/days/2026-11-02/photos").param("albumId", "5").with(authentication(userAuth())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.photos[0].id").value(812))
+
+        verify(getCalendarUseCase).getDayPhotos(1L, date, 5L)
     }
 }

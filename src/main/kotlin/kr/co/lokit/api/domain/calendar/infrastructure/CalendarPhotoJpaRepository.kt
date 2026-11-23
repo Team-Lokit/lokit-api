@@ -18,4 +18,16 @@ interface CalendarPhotoJpaRepository : Repository<PhotoEntity, Long> {
         from: LocalDateTime,
         toExclusive: LocalDateTime,
     ): List<CalendarPhoto>
+
+    @Query(
+        "SELECT new kr.co.lokit.api.domain.calendar.domain.CalendarPhoto(p.id, p.url, p.takenAt, p.address)" +
+            " FROM Photo p" +
+            " WHERE p.album.id = :albumId AND p.takenAt >= :from AND p.takenAt < :toExclusive" +
+            " ORDER BY p.takenAt DESC, p.id DESC",
+    )
+    fun findCalendarPhotosByAlbumId(
+        albumId: Long,
+        from: LocalDateTime,
+        toExclusive: LocalDateTime,
+    ): List<CalendarPhoto>
 }

@@ -10,4 +10,11 @@ interface CalendarPhotoQueryPort {
         from: LocalDateTime,
         toExclusive: LocalDateTime,
     ): List<CalendarPhoto>
+
+    /** [from, toExclusive) 구간의 앨범 사진을 기준 시각 최신순(같으면 id 내림차순)으로 조회한다. */
+    fun findByAlbumIdAndTakenAtRange(
+        albumId: Long,
+        from: LocalDateTime,
+        toExclusive: LocalDateTime,
+    ): List<CalendarPhoto>
 }
