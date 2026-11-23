@@ -24,11 +24,13 @@ class CalendarController(
     override fun getMonth(
         @CurrentUserId userId: Long,
         @RequestParam @DateTimeFormat(pattern = "yyyy-MM") yearMonth: YearMonth,
-    ): CalendarMonthResponse = getCalendarUseCase.getMonth(userId, yearMonth).toResponse()
+        @RequestParam(required = false) albumId: Long?,
+    ): CalendarMonthResponse = getCalendarUseCase.getMonth(userId, yearMonth, albumId).toResponse()
 
     @GetMapping("days/{date}/photos")
     override fun getDayPhotos(
         @CurrentUserId userId: Long,
         @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) date: LocalDate,
-    ): CalendarDayPhotosResponse = getCalendarUseCase.getDayPhotos(userId, date).toDayPhotosResponse(date)
+        @RequestParam(required = false) albumId: Long?,
+    ): CalendarDayPhotosResponse = getCalendarUseCase.getDayPhotos(userId, date, albumId).toDayPhotosResponse(date)
 }
