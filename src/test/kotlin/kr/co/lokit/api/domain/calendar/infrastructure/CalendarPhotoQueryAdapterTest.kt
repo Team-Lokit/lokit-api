@@ -150,4 +150,32 @@ class CalendarPhotoQueryAdapterTest : JpaSliceTest() {
         assertEquals(takenAt, photo.takenAt)
         assertEquals("서울 강남구", photo.address)
     }
+
+    @Test
+    fun `앨범 기준으로 조회하면 같은 커플의 다른 앨범 사진은 제외한다`() {
+        val otherAlbum = albumJpaRepository.save(createAlbumEntity(title = "일상", couple = couple, createdBy = uploader))
+        val t = LocalDateTime.of(2026, 11, 2, 9, 0)
+        val a = savePhoto(t)
+        savePhoto(t.plusHours(1), otherAlbum)
+        val b = savePhoto(t.plusHours(2))
+        savePhoto(to)
+        flushAndClear()
+
+        val result = adapter.findByAlbumIdAndTakenAtRange(album.nonNullId(), from, to)
+
+        assertEquals(listOf(b, a), result.map { it.id })
+    }
+
+    @Test
+    fun `앨범 기준 조회도 삭제된 사진은 제외한다`() {
+        val alive = savePhoto(LocalDateTime.of(2026, 11, 5, 10, 0))
+        val deleted = savePhoto(LocalDateTime.of(2026, 11, 5, 11, 0))
+        flushAndClear()
+        photoJpaRepository.deleteById(deleted)
+        flushAndClear()
+
+        val result = adapter.findByAlbumIdAndTakenAtRange(album.nonNullId(), from, to)
+
+        assertEquals(listOf(alive), result.map { it.id })
+    }
 }

@@ -16,4 +16,11 @@ class JpaCalendarPhotoQueryAdapter(
         from: LocalDateTime,
         toExclusive: LocalDateTime,
     ): List<CalendarPhoto> = calendarPhotoJpaRepository.findCalendarPhotos(coupleId, from, toExclusive)
+
+    @Transactional(readOnly = true)
+    override fun findByAlbumIdAndTakenAtRange(
+        albumId: Long,
+        from: LocalDateTime,
+        toExclusive: LocalDateTime,
+    ): List<CalendarPhoto> = calendarPhotoJpaRepository.findCalendarPhotosByAlbumId(albumId, from, toExclusive)
 }
