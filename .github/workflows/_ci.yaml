@@ -45,7 +45,7 @@ jobs:
                 with:
                     name: app-jar
                     path: app.jar
-                    retention-days: 1
+                    retention-days: 7
                     # jar 는 이미 압축 포맷이라 재압축해도 이득이 거의 없다.
                     compression-level: 0
 

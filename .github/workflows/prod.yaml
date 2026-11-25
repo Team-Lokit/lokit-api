@@ -71,6 +71,12 @@ jobs:
                         read -r STATUS CONCLUSION <<<"$STATE"
                         if [ "$STATUS" = "completed" ]; then
                             if [ "$CONCLUSION" = "success" ]; then
+                                # artifact 는 retention 이 지나면 만료된다. 만료/누락이면 재사용할 수 없으므로 전체 CI 로 폴백.
+                                JAR_COUNT="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?name=app-jar" \
+                                    -q '[.artifacts[] | select(.expired | not)] | length' 2>/dev/null || echo 0)"
+                                if [ "${JAR_COUNT:-0}" -eq 0 ]; then
+                                    echo "develop run 의 app-jar artifact 가 없거나 만료됨 → 전체 CI 실행"; exit 0
+                                fi
                                 echo "develop ci 성공 → 테스트 생략, jar 재사용"
                                 echo "dev-run-id=$RUN_ID" >> "$GITHUB_OUTPUT"
                             else
